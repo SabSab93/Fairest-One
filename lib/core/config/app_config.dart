@@ -40,14 +40,9 @@ class AppConfig {
     return Duration(seconds: int.tryParse(value) ?? 10);
   }
 
-  static String get adminPinHash {
-    const buildValue = String.fromEnvironment('ADMIN_PIN_HASH');
-    return buildValue.isNotEmpty
-        ? buildValue
-        : _env(
-            'ADMIN_PIN_HASH',
-            '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4',
-          );
+  static String get adminPasswordHash {
+    const buildValue = String.fromEnvironment('ADMIN_PASSWORD_HASH');
+    return buildValue.isNotEmpty ? buildValue : _env('ADMIN_PASSWORD_HASH', '');
   }
 
   static String get supabaseUrl {

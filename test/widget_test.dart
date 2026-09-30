@@ -4,9 +4,16 @@ import 'package:fairest_one/features/registration/data/client_store.dart';
 import 'package:fairest_one/features/registration/domain/client_record.dart';
 import 'package:fairest_one/features/registration/presentation/registration_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  setUpAll(() {
+    dotenv.testLoad(
+      fileInput: 'ADMIN_PASSWORD_HASH=8925260c8cb280b26321501c75eec6ffadccc51f05f1c0c54fd1a4f2a4e46861',
+    );
+  });
+
   setUp(() => appRouter.go('/'));
 
   testWidgets('shows the Fairest One dashboard', (tester) async {
@@ -80,13 +87,15 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('unlocks the administration area with code 1234', (tester) async {
+  testWidgets('unlocks the administration area with configured password', (
+    tester,
+  ) async {
     await tester.pumpWidget(const FairestOneApp());
 
     await tester.ensureVisible(find.text('Administration'));
     await tester.tap(find.text('Administration'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), '1234');
+    await tester.enterText(find.byType(TextField), 'iou');
     await tester.tap(find.text('DÉVERROUILLER'));
     await tester.pump();
 

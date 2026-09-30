@@ -40,7 +40,8 @@ class _AdminScreenState extends State<AdminScreen> {
 
   void _unlock() {
     final hash = sha256.convert(utf8.encode(_pinController.text)).toString();
-    if (hash == AppConfig.adminPinHash) {
+    if (AppConfig.adminPasswordHash.isNotEmpty &&
+        hash == AppConfig.adminPasswordHash) {
       setState(() {
         _isUnlocked = true;
         _pinError = null;
@@ -119,15 +120,13 @@ class _AdminLock extends StatelessWidget {
                 controller: controller,
                 autofocus: true,
                 obscureText: true,
-                keyboardType: TextInputType.number,
+                keyboardType: TextInputType.visiblePassword,
                 textInputAction: TextInputAction.done,
-                maxLength: 4,
                 onSubmitted: (_) => onSubmit(),
                 decoration: InputDecoration(
-                  labelText: 'Code administrateur',
-                  prefixIcon: const Icon(Icons.pin_outlined),
+                  labelText: 'Mot de passe administrateur',
+                  prefixIcon: const Icon(Icons.password_rounded),
                   errorText: errorText,
-                  counterText: '',
                 ),
               ),
               const SizedBox(height: 18),
