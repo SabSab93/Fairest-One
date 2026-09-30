@@ -20,6 +20,7 @@ Cette étape rassemble les dimensions utilisées pour construire les logements, 
 
 | Composant | Dimensions relevées | Photo constructeur | Source |
 |---|---|---|---|
+| Miroir rectangulaire | 16 × 12 cm | Photo à ajouter | Mesure communiquée par l'équipe |
 | ESP32-S3-CAM N16R8 + OV5640 | À renseigner | Photo à ajouter | Lien constructeur à ajouter |
 | RFID-RC522 | À renseigner | Photo à ajouter | Lien constructeur à ajouter |
 | LED RGB 5 mm | À renseigner | Photo à ajouter | Lien constructeur à ajouter |

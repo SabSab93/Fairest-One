@@ -1,4 +1,7 @@
 .hero {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   min-height: min(760px, calc(100vh - 64px));
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
@@ -10,6 +13,7 @@
 }
 
 .heroInner {
+  min-width: 0;
   max-width: 760px;
 }
 
@@ -32,6 +36,7 @@
 }
 
 .lead {
+  width: 100%;
   max-width: 570px;
   margin: 38px 0;
   color: #4d4b46;
@@ -64,46 +69,122 @@
   align-items: center;
 }
 
-.mirrorFrame {
-  width: min(100%, 340px);
-  aspect-ratio: 5 / 6;
+.mirrorStage {
+  width: min(100%, 430px);
+  aspect-ratio: 1 / 1;
   display: grid;
   place-items: center;
   position: relative;
-  border: 2px solid #181816;
-  border-radius: 46% 46% 5px 5px;
-  background: #d2cec4;
-  box-shadow: 18px 20px 0 #ebe8e0;
-  overflow: hidden;
+  background: #d9e0d5;
 }
 
-.mirrorFrame::after {
+.colorTile,
+.roseTile {
+  position: absolute;
+  width: 24%;
+  aspect-ratio: 1;
+}
+
+.colorTile {
+  top: -18px;
+  right: -18px;
+  background: #9fb4c4;
+}
+
+.roseTile {
+  bottom: -14px;
+  left: -14px;
+  background: #e7d8d2;
+}
+
+.mirrorFrame {
+  width: 78%;
+  aspect-ratio: 4 / 3;
+  position: relative;
+  border: 2px solid #181816;
+  border-radius: 5px;
+  background: #f1f1ef;
+  box-shadow: 14px 16px 0 #71806e;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.reflection {
+  position: absolute;
+  inset: 0;
+}
+
+.reflection::before,
+.reflection::after {
   content: '';
   position: absolute;
-  width: 150%;
   height: 1px;
-  top: 27%;
-  left: -25%;
   background: #181816;
-  transform: rotate(12deg);
+  transform: rotate(-12deg);
 }
 
-.mirrorFrame span {
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 4rem;
+.reflection::before {
+  width: 125%;
+  top: 28%;
+  left: -12%;
 }
 
-.mirrorFrame i {
+.reflection::after {
+  width: 66%;
+  right: -9%;
+  bottom: 23%;
+}
+
+.reflection span {
   position: absolute;
-  width: 9px;
-  height: 9px;
-  bottom: 24px;
+  border-radius: 50% 50% 45% 55%;
+  background: #71806e;
+  transform: rotate(34deg);
+}
+
+.reflection span:first-child {
+  width: 34px;
+  height: 72px;
+  left: 19%;
+  bottom: 16%;
+}
+
+.reflection span:last-child {
+  width: 26px;
+  height: 54px;
+  left: 32%;
+  bottom: 12%;
+  background: #b87862;
+  transform: rotate(-28deg);
+}
+
+.camera,
+.statusLight {
+  position: absolute;
   border-radius: 50%;
-  background: #788978;
+  z-index: 2;
+}
+
+.camera {
+  width: 8px;
+  height: 8px;
+  top: 9px;
+  left: 50%;
+  border: 1px solid #71806e;
+  background: #181816;
+}
+
+.statusLight {
+  width: 7px;
+  height: 7px;
+  right: 12px;
+  bottom: 10px;
+  background: #b87862;
 }
 
 .mirrorVisual p {
   margin-top: 24px;
+  color: #52604f;
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.16em;
@@ -111,12 +192,12 @@
 
 .statement {
   padding: 110px max(32px, calc((100vw - 1200px) / 2));
-  background: #171715;
+  background: #52604f;
   color: #f4f2ed;
 }
 
 .statement > p {
-  color: #aaa69c;
+  color: #d9e0d5;
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.18em;
@@ -136,7 +217,7 @@
   display: block;
   max-width: 520px;
   margin-left: auto;
-  color: #c7c3ba;
+  color: #e8ebe5;
   line-height: 1.7;
 }
 
@@ -155,6 +236,7 @@
   border-top: 1px solid #bebbb3;
   border-right: 1px solid #bebbb3;
   color: #171715;
+  overflow: hidden;
 }
 
 .chapter:first-child {
@@ -162,9 +244,25 @@
 }
 
 .chapter:hover {
-  background: #e8e4da;
+  background: #f1f1ef;
   color: #171715;
   text-decoration: none;
+}
+
+.chapterColor {
+  width: 42px;
+  height: 9px;
+  display: block;
+  margin-bottom: 24px;
+  background: #71806e;
+}
+
+.chapterColor[data-color='1'] {
+  background: #b87862;
+}
+
+.chapterColor[data-color='2'] {
+  background: #829dad;
 }
 
 .chapterNumber {
@@ -174,7 +272,7 @@
 }
 
 .chapter h3 {
-  margin-top: 70px;
+  margin-top: 42px;
   font-family: Georgia, 'Times New Roman', serif;
   font-size: 2.8rem;
   font-weight: 400;
@@ -200,7 +298,7 @@
   align-items: end;
   gap: 50px;
   padding: 72px max(32px, calc((100vw - 1240px) / 2));
-  background: #cbc5b8;
+  background: #e7d8d2;
   color: #171715;
 }
 
@@ -229,6 +327,7 @@
     min-height: auto;
     grid-template-columns: 1fr;
     padding: 60px 24px 72px;
+    overflow: hidden;
   }
 
   .hero h1 {
@@ -240,7 +339,21 @@
   }
 
   .mirrorFrame {
-    width: min(75vw, 300px);
+    width: 78%;
+  }
+
+  .mirrorStage {
+    width: min(100%, 390px);
+  }
+
+  .colorTile {
+    top: 0;
+    right: 0;
+  }
+
+  .roseTile {
+    bottom: 0;
+    left: 0;
   }
 
   .statement {

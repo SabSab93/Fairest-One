@@ -44,11 +44,19 @@ export default function Home(): ReactNode {
             </Link>
           </div>
           <div className={styles.mirrorVisual} aria-hidden="true">
-            <div className={styles.mirrorFrame}>
-              <span>FO</span>
-              <i />
+            <div className={styles.mirrorStage}>
+              <span className={styles.colorTile} />
+              <span className={styles.roseTile} />
+              <div className={styles.mirrorFrame}>
+                <div className={styles.reflection}>
+                  <span />
+                  <span />
+                </div>
+                <i className={styles.camera} />
+                <i className={styles.statusLight} />
+              </div>
             </div>
-            <p>25 × 30 cm</p>
+            <p>MIROIR · 16 × 12 CM</p>
           </div>
         </section>
 
@@ -66,8 +74,9 @@ export default function Home(): ReactNode {
         </section>
 
         <section className={styles.chapters}>
-          {chapters.map((chapter) => (
+          {chapters.map((chapter, index) => (
             <Link to={chapter.link} className={styles.chapter} key={chapter.number}>
+              <span className={styles.chapterColor} data-color={index} />
               <span className={styles.chapterNumber}>{chapter.number}</span>
               <Heading as="h3">{chapter.title}</Heading>
               <p>{chapter.text}</p>
