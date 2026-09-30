@@ -7,8 +7,8 @@ const config: Config = {
   tagline: 'Journal de conception du miroir connecté',
   favicon: 'img/favicon.png',
   future: {v4: true},
-  url: 'https://sabsab93.github.io',
-  baseUrl: '/Fairest-One/',
+  url: 'https://fairest-one.vercel.app',
+  baseUrl: '/',
   organizationName: 'SabSab93',
   projectName: 'Fairest-One',
   onBrokenLinks: 'throw',
@@ -24,7 +24,7 @@ const config: Config = {
           sidebarPath: './sidebars.ts',
           routeBasePath: 'construction',
           editUrl:
-            'https://github.com/SabSab93/Fairest-One/edit/feature/docusaurus-build-journal/documentation/',
+            'https://github.com/SabSab93/Fairest-One/edit/main/documentation/',
         },
         blog: false,
         theme: {

@@ -14,7 +14,7 @@ npm install
 npm start
 ```
 
-Le site est servi sous `/Fairest-One/`.
+Le site est servi à la racine, sous `/`.
 
 ## Vérifications
 
