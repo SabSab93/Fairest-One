@@ -1,0 +1,31 @@
+name: fairest_one
+description: "A minimalist Flutter app for the Fairest One smart mirror project."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.4
+
+dependencies:
+  crypto: ^3.0.7
+  flutter:
+    sdk: flutter
+  flutter_dotenv: ^6.0.1
+  go_router: ^18.0.2
+  http: ^1.6.0
+  shared_preferences: ^2.5.5
+  supabase_flutter: ^2.18.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - .env
+  fonts:
+    - family: Cormorant Garamond
+      fonts:
+        - asset: assets/fonts/CormorantGaramond-Variable.ttf
