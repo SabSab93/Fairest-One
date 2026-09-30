@@ -140,6 +140,28 @@ flutter analyze
 flutter test
 ```
 
+## Documentation du prototype
+
+Le journal de conception et de fabrication est construit avec Docusaurus :
+
+- [Documentation en ligne](https://fairest-one.vercel.app/)
+- [Sources de la documentation](documentation/)
+
+Pour lancer le site localement :
+
+```sh
+cd documentation
+npm install
+npm start
+```
+
+Pour vérifier la version de production :
+
+```sh
+npm run typecheck
+npm run build
+```
+
 ## Remaining Local Setup
 
 For Android builds, install Android Studio and the Android SDK.

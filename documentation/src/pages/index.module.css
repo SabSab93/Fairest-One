@@ -1,0 +1,377 @@
+.hero {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  min-height: min(760px, calc(100vh - 64px));
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+  align-items: center;
+  gap: 7vw;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 72px 40px 88px;
+}
+
+.heroInner {
+  min-width: 0;
+  max-width: 760px;
+}
+
+.eyebrow {
+  margin: 0 0 28px;
+  color: #77736b;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.hero h1 {
+  margin: 0;
+  color: #11110f;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(5rem, 10vw, 9.5rem);
+  font-weight: 400;
+  line-height: 0.84;
+  letter-spacing: 0;
+}
+
+.lead {
+  width: 100%;
+  max-width: 570px;
+  margin: 38px 0;
+  color: #4d4b46;
+  font-size: 1.25rem;
+  line-height: 1.65;
+}
+
+.primaryAction {
+  display: inline-flex;
+  gap: 30px;
+  align-items: center;
+  padding: 15px 21px;
+  border: 1px solid #161614;
+  color: #161614;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.primaryAction:hover {
+  background: #161614;
+  color: #fff;
+  text-decoration: none;
+}
+
+.mirrorVisual {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.mirrorStage {
+  width: min(100%, 430px);
+  aspect-ratio: 1 / 1;
+  display: grid;
+  place-items: center;
+  position: relative;
+  background: #d9e0d5;
+}
+
+.colorTile,
+.roseTile {
+  position: absolute;
+  width: 24%;
+  aspect-ratio: 1;
+}
+
+.colorTile {
+  top: -18px;
+  right: -18px;
+  background: #9fb4c4;
+}
+
+.roseTile {
+  bottom: -14px;
+  left: -14px;
+  background: #e7d8d2;
+}
+
+.mirrorFrame {
+  width: 78%;
+  aspect-ratio: 4 / 3;
+  position: relative;
+  border: 2px solid #181816;
+  border-radius: 5px;
+  background: #f1f1ef;
+  box-shadow: 14px 16px 0 #71806e;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.reflection {
+  position: absolute;
+  inset: 0;
+}
+
+.reflection::before,
+.reflection::after {
+  content: '';
+  position: absolute;
+  height: 1px;
+  background: #181816;
+  transform: rotate(-12deg);
+}
+
+.reflection::before {
+  width: 125%;
+  top: 28%;
+  left: -12%;
+}
+
+.reflection::after {
+  width: 66%;
+  right: -9%;
+  bottom: 23%;
+}
+
+.reflection span {
+  position: absolute;
+  border-radius: 50% 50% 45% 55%;
+  background: #71806e;
+  transform: rotate(34deg);
+}
+
+.reflection span:first-child {
+  width: 34px;
+  height: 72px;
+  left: 19%;
+  bottom: 16%;
+}
+
+.reflection span:last-child {
+  width: 26px;
+  height: 54px;
+  left: 32%;
+  bottom: 12%;
+  background: #b87862;
+  transform: rotate(-28deg);
+}
+
+.camera,
+.statusLight {
+  position: absolute;
+  border-radius: 50%;
+  z-index: 2;
+}
+
+.camera {
+  width: 8px;
+  height: 8px;
+  top: 9px;
+  left: 50%;
+  border: 1px solid #71806e;
+  background: #181816;
+}
+
+.statusLight {
+  width: 7px;
+  height: 7px;
+  right: 12px;
+  bottom: 10px;
+  background: #b87862;
+}
+
+.mirrorVisual p {
+  margin-top: 24px;
+  color: #52604f;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.statement {
+  padding: 110px max(32px, calc((100vw - 1200px) / 2));
+  background: #52604f;
+  color: #f4f2ed;
+}
+
+.statement > p {
+  color: #d9e0d5;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.statement h2 {
+  max-width: 850px;
+  margin: 32px 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(3.4rem, 7vw, 7rem);
+  font-weight: 400;
+  line-height: 0.98;
+  letter-spacing: 0;
+}
+
+.statement > span {
+  display: block;
+  max-width: 520px;
+  margin-left: auto;
+  color: #e8ebe5;
+  line-height: 1.7;
+}
+
+.chapters {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 96px 40px;
+}
+
+.chapter {
+  min-height: 320px;
+  padding: 28px;
+  position: relative;
+  border-top: 1px solid #bebbb3;
+  border-right: 1px solid #bebbb3;
+  color: #171715;
+  overflow: hidden;
+}
+
+.chapter:first-child {
+  border-left: 1px solid #bebbb3;
+}
+
+.chapter:hover {
+  background: #f1f1ef;
+  color: #171715;
+  text-decoration: none;
+}
+
+.chapterNumber {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.chapter h3 {
+  margin-top: 70px;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 2.8rem;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.chapter p {
+  max-width: 310px;
+  color: #64615a;
+  line-height: 1.6;
+}
+
+.chapterArrow {
+  position: absolute;
+  top: 26px;
+  right: 28px;
+  font-size: 1.3rem;
+}
+
+.budget {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: end;
+  gap: 50px;
+  padding: 72px max(32px, calc((100vw - 1240px) / 2));
+  border-top: 1px solid #c5d2d9;
+  background: #e5ecef;
+  color: #171715;
+  margin-bottom: 48px;
+}
+
+.budgetLabel {
+  width: fit-content;
+  margin: 0 0 28px;
+  padding-bottom: 7px;
+  border-bottom: 5px solid #c99d8f;
+  color: #5f6f78;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.budget h2 {
+  margin: 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(4rem, 7vw, 7rem);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.budget > p {
+  max-width: 390px;
+  line-height: 1.6;
+}
+
+.budget > a {
+  padding-bottom: 4px;
+  border-bottom: 1px solid;
+  color: #171715;
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .hero {
+    min-height: auto;
+    grid-template-columns: 1fr;
+    padding: 60px 24px 72px;
+    overflow: hidden;
+  }
+
+  .hero h1 {
+    font-size: clamp(4.7rem, 22vw, 7rem);
+  }
+
+  .mirrorVisual {
+    margin-top: 24px;
+  }
+
+  .mirrorFrame {
+    width: 78%;
+  }
+
+  .mirrorStage {
+    width: min(100%, 390px);
+  }
+
+  .colorTile {
+    top: 0;
+    right: 0;
+  }
+
+  .roseTile {
+    bottom: 0;
+    left: 0;
+  }
+
+  .statement {
+    padding: 76px 24px;
+  }
+
+  .chapters {
+    grid-template-columns: 1fr;
+    padding: 64px 24px;
+  }
+
+  .chapter {
+    min-height: 260px;
+    border-left: 1px solid #bebbb3;
+    border-bottom: 1px solid #bebbb3;
+  }
+
+  .budget {
+    grid-template-columns: 1fr;
+    align-items: start;
+    padding: 64px 24px;
+    margin-bottom: 28px;
+  }
+}

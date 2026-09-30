@@ -1,0 +1,58 @@
+---
+title: Composants et BOM
+sidebar_position: 3
+description: Nomenclature et budget du miroir connecté et de la borne tablette.
+---
+
+# Composants et BOM
+
+Le budget transmis distingue le miroir et la borne tablette. Les prix sont ceux du document de travail et peuvent évoluer.
+
+<div className="metric-row">
+  <div className="metric"><span>Miroir</span><strong>63,55 €</strong></div>
+  <div className="metric"><span>Borne tablette</span><strong>55,79 €</strong></div>
+  <div className="metric metric--dark"><span>Prototype complet</span><strong>119,34 €</strong></div>
+</div>
+
+## Miroir rectangulaire 16 × 12 cm
+
+Cadre imprimé en 3D avec une LED RGB, dans une configuration prototype à budget minimum.
+
+| Lot | Composant | Spécification | Qté | Total | Priorité | Rôle | Source |
+|---|---|---|---:|---:|---|---|---|
+| Électronique | ESP32-S3-CAM N16R8 + OV5640 | 16 MB Flash, 8 MB PSRAM, Wi-Fi/BLE, caméra 5 MP autofocus | 1 | 17,99 € | Obligatoire | Contrôle, capture et Wi-Fi | [Atelier de la Robotique](https://www.atelierdelarobotique.fr/produit/esp32-s3-cam-n16r8-avec-camera-ov5640-5-mp) |
+| Électronique | RFID-RC522 (MFRC522) | 13,56 MHz, ISO/IEC 14443A, SPI, 3,3 V | 1 | 4,00 € | Obligatoire | Lecture carte client | [AliExpress](https://fr.aliexpress.com/item/1005006087459353.html) |
+| Signalisation | LED RGB 5 mm cathode commune | 4 pattes, pilotée par 3 GPIO | 1 | 0,50 € | Obligatoire | Décompte 5 s et succès/erreur | Estimation générique |
+| Signalisation | Résistances 220–330 Ω | Une résistance par canal R/G/B | 3 | 0,15 € | Obligatoire | Limitation du courant | Estimation composants |
+| Alimentation | Alimentation 5 V / 2 A | 10 W | 1 | 5,99 € | Obligatoire | Alimentation du miroir | Estimation générique |
+| Alimentation | Distribution 5 V | Bornier et câble | 1 | 3,00 € | Obligatoire | Distribution électrique | Estimation générique |
+| Optique | PMMA transparent | 30 × 30 cm, 2–3 mm | 1 | 9,03 € | Obligatoire | Support du film miroir | [AliExpress](https://fr.aliexpress.com/item/1005009803763809.html) |
+| Optique | Film miroir sans tain | Minimum 30 × 30 cm | 1 | 4,00 € | Obligatoire | Face semi-transparente | Estimation générique |
+| Structure 3D | Filament PLA | Environ 190 g | 0,19 kg | 3,80 € | Obligatoire | Cadre imprimé en 3D | Hypothèse : 20 €/kg |
+| Structure 3D | Diffuseur LED translucide | Petit insert ou dôme | 1 | 0,50 € | Recommandé | Visibilité du clignotement | Estimation matière |
+| Structure 3D | Inserts filetés M3 | Inserts thermiques | 8 | 0,96 € | Recommandé | Assemblage démontable | Estimation en lot |
+| Structure 3D | Vis M3 | M3×8 / M3×12 | 8 | 0,64 € | Recommandé | Cadre et électronique | Estimation en lot |
+| Structure | Fond fin | PVC expansé ou MDF, 25 × 30 cm, 3 mm | 1 | 2,00 € | Obligatoire | Fermeture arrière | Estimation découpe |
+| Fixation | Double-face et colliers | Petit lot | 1 | 3,00 € | Obligatoire | Fixation électronique et câbles | Estimation en lot |
+| Câblage | Jumper / fils | Dupont et soudures | 1 | 4,00 € | Obligatoire | Connexions internes | Estimation en lot |
+| Signalisation | Buzzer passif / piézo 3,3 V | Pilotable par PWM | 1 | 0,50 € | Recommandé | Validation et erreur | [AliExpress](https://fr.aliexpress.com/item/1005006260328559.html) |
+| NFC | Cartes RFID vierges | Lot de 10, MIFARE 13,56 MHz | 1 | 3,49 € | Obligatoire | Cartes clients de test | [AliExpress](https://fr.aliexpress.com/item/1005005580896599.html) |
+
+**Total miroir : 63,55 €**
+
+## Borne tablette
+
+| Lot | Composant | Spécification | Qté | Total | Priorité | Rôle | Source |
+|---|---|---|---:|---:|---|---|---|
+| Borne | Tablette Android 7 pouces | 4 Go RAM, 64 Go minimum, Wi-Fi, NFC | 1 | 29,79 € | Obligatoire | Saisie e-mail, galerie et sélection | [AliExpress](https://fr.aliexpress.com/item/1005012169566663.html) |
+| NFC | ESP32-C3 Mini | Microcontrôleur Wi-Fi/BLE | 1 | 4,00 € | Obligatoire | Pont NFC tablette | Estimation générique |
+| NFC | RFID-RC522 (MFRC522) | 13,56 MHz, SPI, 3,3 V | 1 | 4,00 € | Obligatoire | Lecture de carte sur la borne | Référence générique |
+| Alimentation | Chargeur USB tablette | 5 V / USB-C selon modèle | 1 | 7,00 € | Obligatoire | Alimentation permanente | Estimation générique |
+| Alimentation | Câble USB-C | 1 à 2 m | 1 | 3,00 € | Obligatoire | Connexion d'alimentation | Estimation générique |
+| Support | Support tablette | Support de comptoir simple | 1 | 8,00 € | Obligatoire | Fixation de la borne | Estimation générique |
+
+**Total borne tablette : 55,79 €**
+
+:::info Périmètre
+Cette page restitue la nomenclature fournie. Elle ne confirme ni la disponibilité actuelle, ni les caractéristiques des vendeurs.
+:::
