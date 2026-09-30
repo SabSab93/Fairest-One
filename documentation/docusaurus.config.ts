@@ -64,7 +64,8 @@ const config: Config = {
     footer: {
       style: 'light',
       links: [],
-      copyright: `Fairest One · Journal de conception · ${new Date().getFullYear()}`,
+      copyright:
+        'MyDigitalSchool Grenoble · 2026 | Valérie RASOLOFOARISON & Sabrina HAMMADI',
     },
     prism: {
       theme: prismThemes.github,

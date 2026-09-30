@@ -249,22 +249,6 @@
   text-decoration: none;
 }
 
-.chapterColor {
-  width: 42px;
-  height: 9px;
-  display: block;
-  margin-bottom: 24px;
-  background: #71806e;
-}
-
-.chapterColor[data-color='1'] {
-  background: #b87862;
-}
-
-.chapterColor[data-color='2'] {
-  background: #829dad;
-}
-
 .chapterNumber {
   font-size: 0.72rem;
   font-weight: 700;
@@ -272,7 +256,7 @@
 }
 
 .chapter h3 {
-  margin-top: 42px;
+  margin-top: 70px;
   font-family: Georgia, 'Times New Roman', serif;
   font-size: 2.8rem;
   font-weight: 400;
@@ -301,6 +285,7 @@
   border-top: 1px solid #c5d2d9;
   background: #e5ecef;
   color: #171715;
+  margin-bottom: 96px;
 }
 
 .budgetLabel {
@@ -387,5 +372,6 @@
     grid-template-columns: 1fr;
     align-items: start;
     padding: 64px 24px;
+    margin-bottom: 56px;
   }
 }

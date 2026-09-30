@@ -74,9 +74,8 @@ export default function Home(): ReactNode {
         </section>
 
         <section className={styles.chapters}>
-          {chapters.map((chapter, index) => (
+          {chapters.map((chapter) => (
             <Link to={chapter.link} className={styles.chapter} key={chapter.number}>
-              <span className={styles.chapterColor} data-color={index} />
               <span className={styles.chapterNumber}>{chapter.number}</span>
               <Heading as="h3">{chapter.title}</Heading>
               <p>{chapter.text}</p>
