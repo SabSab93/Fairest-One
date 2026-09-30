@@ -61,15 +61,15 @@ export default function Home(): ReactNode {
         </section>
 
         <section className={styles.statement}>
-          <p>DE L’IDÉE À L’OBJET</p>
+          <p>PROJET DE COURS · OBJET CONNECTÉ</p>
           <Heading as="h2">
-            Chaque décision,
+            Conception et réalisation
             <br />
-            mesure et essai.
+            du prototype.
           </Heading>
           <span>
-            Une documentation progressive, complétée au rythme de la
-            fabrication réelle du prototype.
+            Ce dossier présente nos recherches, nos choix techniques et les
+            différentes étapes de fabrication de Fairest One.
           </span>
         </section>
 
