@@ -110,9 +110,10 @@ flutter run --dart-define=API_BASE_URL=http://192.168.1.50:8080/
 See [docs/iot-architecture.md](docs/iot-architecture.md) for the Raspberry Pi,
 Arduino, network, and API plan.
 
-The proposed Supabase tables are available in
-[docs/supabase-schema.sql](docs/supabase-schema.sql). This file is a proposal
-only and has not been executed against a Supabase project.
+The Supabase tables are defined in
+[docs/supabase-schema.sql](docs/supabase-schema.sql). The schema has been
+executed on the project; secure RLS policies still need to be added before
+enabling Supabase in the application.
 
 ## Install Dependencies
 
