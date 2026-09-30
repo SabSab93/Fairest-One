@@ -9,8 +9,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   setUpAll(() {
-    dotenv.testLoad(
-      fileInput: 'ADMIN_PASSWORD_HASH=8925260c8cb280b26321501c75eec6ffadccc51f05f1c0c54fd1a4f2a4e46861',
+    dotenv.loadFromString(
+      envString: 'ADMIN_PASSWORD_HASH=8925260c8cb280b26321501c75eec6ffadccc51f05f1c0c54fd1a4f2a4e46861',
     );
   });
 
