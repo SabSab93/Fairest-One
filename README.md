@@ -140,6 +140,24 @@ flutter analyze
 flutter test
 ```
 
+## Documentation du prototype
+
+Le journal de conception Docusaurus se trouve dans `documentation/`.
+
+```sh
+cd documentation
+npm install
+npm start
+```
+
+Le site local est ensuite disponible à l'adresse indiquée par Docusaurus.
+Pour vérifier la version de production :
+
+```sh
+npm run typecheck
+npm run build
+```
+
 ## Remaining Local Setup
 
 For Android builds, install Android Studio and the Android SDK.

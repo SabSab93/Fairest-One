@@ -1,0 +1,266 @@
+.hero {
+  min-height: min(760px, calc(100vh - 64px));
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+  align-items: center;
+  gap: 7vw;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 72px 40px 88px;
+}
+
+.heroInner {
+  max-width: 760px;
+}
+
+.eyebrow {
+  margin: 0 0 28px;
+  color: #77736b;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.hero h1 {
+  margin: 0;
+  color: #11110f;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(5rem, 10vw, 9.5rem);
+  font-weight: 400;
+  line-height: 0.84;
+  letter-spacing: 0;
+}
+
+.lead {
+  max-width: 570px;
+  margin: 38px 0;
+  color: #4d4b46;
+  font-size: 1.25rem;
+  line-height: 1.65;
+}
+
+.primaryAction {
+  display: inline-flex;
+  gap: 30px;
+  align-items: center;
+  padding: 15px 21px;
+  border: 1px solid #161614;
+  color: #161614;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.primaryAction:hover {
+  background: #161614;
+  color: #fff;
+  text-decoration: none;
+}
+
+.mirrorVisual {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.mirrorFrame {
+  width: min(100%, 340px);
+  aspect-ratio: 5 / 6;
+  display: grid;
+  place-items: center;
+  position: relative;
+  border: 2px solid #181816;
+  border-radius: 46% 46% 5px 5px;
+  background: #d2cec4;
+  box-shadow: 18px 20px 0 #ebe8e0;
+  overflow: hidden;
+}
+
+.mirrorFrame::after {
+  content: '';
+  position: absolute;
+  width: 150%;
+  height: 1px;
+  top: 27%;
+  left: -25%;
+  background: #181816;
+  transform: rotate(12deg);
+}
+
+.mirrorFrame span {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 4rem;
+}
+
+.mirrorFrame i {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  bottom: 24px;
+  border-radius: 50%;
+  background: #788978;
+}
+
+.mirrorVisual p {
+  margin-top: 24px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.statement {
+  padding: 110px max(32px, calc((100vw - 1200px) / 2));
+  background: #171715;
+  color: #f4f2ed;
+}
+
+.statement > p {
+  color: #aaa69c;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.statement h2 {
+  max-width: 850px;
+  margin: 32px 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(3.4rem, 7vw, 7rem);
+  font-weight: 400;
+  line-height: 0.98;
+  letter-spacing: 0;
+}
+
+.statement > span {
+  display: block;
+  max-width: 520px;
+  margin-left: auto;
+  color: #c7c3ba;
+  line-height: 1.7;
+}
+
+.chapters {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 96px 40px;
+}
+
+.chapter {
+  min-height: 320px;
+  padding: 28px;
+  position: relative;
+  border-top: 1px solid #bebbb3;
+  border-right: 1px solid #bebbb3;
+  color: #171715;
+}
+
+.chapter:first-child {
+  border-left: 1px solid #bebbb3;
+}
+
+.chapter:hover {
+  background: #e8e4da;
+  color: #171715;
+  text-decoration: none;
+}
+
+.chapterNumber {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.chapter h3 {
+  margin-top: 70px;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 2.8rem;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.chapter p {
+  max-width: 310px;
+  color: #64615a;
+  line-height: 1.6;
+}
+
+.chapterArrow {
+  position: absolute;
+  top: 26px;
+  right: 28px;
+  font-size: 1.3rem;
+}
+
+.budget {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: end;
+  gap: 50px;
+  padding: 72px max(32px, calc((100vw - 1240px) / 2));
+  background: #cbc5b8;
+  color: #171715;
+}
+
+.budget h2 {
+  margin: 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(4rem, 7vw, 7rem);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.budget > p {
+  max-width: 390px;
+  line-height: 1.6;
+}
+
+.budget > a {
+  padding-bottom: 4px;
+  border-bottom: 1px solid;
+  color: #171715;
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .hero {
+    min-height: auto;
+    grid-template-columns: 1fr;
+    padding: 60px 24px 72px;
+  }
+
+  .hero h1 {
+    font-size: clamp(4.7rem, 22vw, 7rem);
+  }
+
+  .mirrorVisual {
+    margin-top: 24px;
+  }
+
+  .mirrorFrame {
+    width: min(75vw, 300px);
+  }
+
+  .statement {
+    padding: 76px 24px;
+  }
+
+  .chapters {
+    grid-template-columns: 1fr;
+    padding: 64px 24px;
+  }
+
+  .chapter {
+    min-height: 260px;
+    border-left: 1px solid #bebbb3;
+    border-bottom: 1px solid #bebbb3;
+  }
+
+  .budget {
+    grid-template-columns: 1fr;
+    align-items: start;
+    padding: 64px 24px;
+  }
+}

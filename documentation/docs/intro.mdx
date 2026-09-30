@@ -1,0 +1,44 @@
+---
+id: introduction
+title: Le projet
+sidebar_position: 1
+description: Point de départ du journal de conception et de fabrication de Fairest One.
+---
+
+# Construire Fairest One
+
+Fairest One est un projet étudiant de Master 2 autour de l'IoT et des systèmes embarqués. Le prototype prend la forme d'un miroir connecté destiné aux opticiens.
+
+Le parcours envisagé associe une adresse e-mail à une carte RFID/NFC. Devant le miroir, le client présente sa carte, déclenche une séquence de prise de vue et peut ensuite retrouver ses photos depuis une borne.
+
+## Ce que documente ce site
+
+Ce site suit la construction du prototype, depuis l'idée initiale jusqu'au montage final. Il rassemble les décisions, les dimensions, les essais et les éléments nécessaires pour comprendre la démarche.
+
+| Étape | Contenu | État documentaire |
+|---|---|---|
+| 01 | Idée et inspirations | À compléter avec les sources |
+| 02 | Composants et budget | BOM renseigné |
+| 03 | Relevés dimensionnels | En attente des mesures et photos constructeur |
+| 04 | Esquisses papier | En attente des photographies |
+| 05 | Conception Fusion 360 | En attente des captures et explications |
+| 06 | Pièces pour impression 3D | En attente des rendus et explications |
+| 07 | Impression 3D | En attente des photographies et réglages |
+| 08 | Électronique et Arduino | En attente du schéma et du code |
+| 09 | Montage final | En attente des photographies d'assemblage |
+
+:::note Principe éditorial
+Les emplacements non renseignés sont volontairement laissés vides. Ils seront complétés uniquement avec les photographies, sources et explications réelles du projet.
+:::
+
+## Architecture envisagée
+
+```text
+Application Flutter <-> Backend / API <-> ESP32
+```
+
+Les communications pourront évoluer entre HTTP/REST, WebSocket ou MQTT. Le choix définitif n'est pas encore arrêté.
+
+## Parcours du site
+
+Commencez par [l'idée de départ](./idee-et-inspirations), puis suivez les étapes dans l'ordre du menu.
