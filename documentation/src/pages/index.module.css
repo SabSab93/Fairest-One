@@ -285,7 +285,7 @@
   border-top: 1px solid #c5d2d9;
   background: #e5ecef;
   color: #171715;
-  margin-bottom: 96px;
+  margin-bottom: 48px;
 }
 
 .budgetLabel {
@@ -372,6 +372,6 @@
     grid-template-columns: 1fr;
     align-items: start;
     padding: 64px 24px;
-    margin-bottom: 56px;
+    margin-bottom: 28px;
   }
 }
