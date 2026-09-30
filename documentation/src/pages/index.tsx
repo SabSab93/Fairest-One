@@ -87,7 +87,7 @@ export default function Home(): ReactNode {
 
         <section className={styles.budget}>
           <div>
-            <p className={styles.eyebrow}>BOM · PROTOTYPE MINIMUM</p>
+            <p className={styles.budgetLabel}>BOM · PROTOTYPE MINIMUM</p>
             <Heading as="h2">119,34 €</Heading>
           </div>
           <p>

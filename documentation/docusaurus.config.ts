@@ -52,12 +52,7 @@ const config: Config = {
           type: 'docSidebar',
           sidebarId: 'buildJournal',
           position: 'left',
-          label: 'Construction',
-        },
-        {
-          to: '/construction/bom',
-          label: 'BOM',
-          position: 'left',
+          label: 'Journal de fabrication',
         },
         {
           href: 'https://github.com/SabSab93/Fairest-One',
@@ -68,31 +63,7 @@ const config: Config = {
     },
     footer: {
       style: 'light',
-      links: [
-        {
-          title: 'Journal',
-          items: [
-            {label: 'Le projet', to: '/construction/introduction'},
-            {label: 'Composants et BOM', to: '/construction/bom'},
-          ],
-        },
-        {
-          title: 'Fabrication',
-          items: [
-            {label: 'Conception 3D', to: '/construction/conception-fusion'},
-            {label: 'Montage', to: '/construction/montage-final'},
-          ],
-        },
-        {
-          title: 'Projet',
-          items: [
-            {
-              label: 'Dépôt GitHub',
-              href: 'https://github.com/SabSab93/Fairest-One',
-            },
-          ],
-        },
-      ],
+      links: [],
       copyright: `Fairest One · Journal de conception · ${new Date().getFullYear()}`,
     },
     prism: {

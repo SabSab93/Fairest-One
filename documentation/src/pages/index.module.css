@@ -298,8 +298,20 @@
   align-items: end;
   gap: 50px;
   padding: 72px max(32px, calc((100vw - 1240px) / 2));
-  background: #e7d8d2;
+  border-top: 1px solid #c5d2d9;
+  background: #e5ecef;
   color: #171715;
+}
+
+.budgetLabel {
+  width: fit-content;
+  margin: 0 0 28px;
+  padding-bottom: 7px;
+  border-bottom: 5px solid #c99d8f;
+  color: #5f6f78;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
 }
 
 .budget h2 {
