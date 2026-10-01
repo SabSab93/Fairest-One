@@ -60,11 +60,20 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         email: _emailController.text,
         cardUid: _cardController.text,
       );
+      if (result == ClientSaveResult.created && AppConfig.useMockIot) {
+        try {
+          await const DemoCardStore().save(_cardController.text);
+        } catch (_) {
+          // The remote client is already saved; demo-card caching is optional.
+        }
+      }
       if (!mounted) return;
 
       final message = switch (result) {
         ClientSaveResult.created =>
-          'Client et carte NFC enregistrés sur cet appareil.',
+          AppConfig.useRemoteData
+              ? 'Client et carte NFC enregistrés dans Supabase.'
+              : 'Client et carte NFC enregistrés sur cet appareil.',
         ClientSaveResult.emailAlreadyExists =>
           'Cette adresse email est déjà enregistrée.',
         ClientSaveResult.cardAlreadyAssigned =>

@@ -144,7 +144,7 @@ flutter test
 
 Le journal de conception et de fabrication est construit avec Docusaurus :
 
-- [Documentation en ligne](https://fairest-one.vercel.app/)
+- [Documentation en ligne](https://documentation-theta-eight.vercel.app/)
 - [Sources de la documentation](documentation/)
 
 Pour lancer le site localement :

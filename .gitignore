@@ -47,3 +47,8 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Vercel and production build tooling
+.vercel/
+.vercel-cache/
+node_modules/
