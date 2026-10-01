@@ -162,12 +162,6 @@ npm run typecheck
 npm run build
 ```
 
-## Mise en production
-
-L'application Flutter Web utilise une API Vercel devant Supabase. Le guide
-complet, les variables nécessaires et le SQL de sécurisation sont détaillés
-dans [docs/production-deployment.md](docs/production-deployment.md).
-
 ## Remaining Local Setup
 
 For Android builds, install Android Studio and the Android SDK.
