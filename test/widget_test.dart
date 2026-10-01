@@ -134,5 +134,6 @@ class _FakeClientStore implements ClientStore {
   }
 
   @override
-  Future<List<ClientRecord>> getClients() async => List.unmodifiable(clients);
+  Future<List<ClientRecord>> getClients({String? adminPassword}) async =>
+      List.unmodifiable(clients);
 }

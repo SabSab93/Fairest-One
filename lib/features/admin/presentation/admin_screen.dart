@@ -30,6 +30,7 @@ class _AdminScreenState extends State<AdminScreen> {
 
   bool _isUnlocked = false;
   String? _pinError;
+  String? _adminPassword;
   _AdminSection _section = _AdminSection.clients;
 
   @override
@@ -38,7 +39,31 @@ class _AdminScreenState extends State<AdminScreen> {
     super.dispose();
   }
 
-  void _unlock() {
+  Future<void> _unlock() async {
+    if (AppConfig.useRemoteData) {
+      try {
+        await widget.clientStore.getClients(adminPassword: _pinController.text);
+      } on AdminAccessDeniedException {
+        if (mounted) {
+          setState(() => _pinError = 'Mot de passe administrateur incorrect');
+        }
+        return;
+      } catch (_) {
+        if (mounted) {
+          setState(() => _pinError = 'Impossible de joindre le serveur');
+        }
+        return;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _isUnlocked = true;
+        _adminPassword = _pinController.text;
+        _pinError = null;
+      });
+      return;
+    }
+
     final hash = sha256.convert(utf8.encode(_pinController.text)).toString();
     if (AppConfig.adminPasswordHash.isNotEmpty &&
         hash == AppConfig.adminPasswordHash) {
@@ -66,6 +91,7 @@ class _AdminScreenState extends State<AdminScreen> {
         child: _isUnlocked
             ? _AdminDashboard(
                 clientStore: widget.clientStore,
+                adminPassword: _adminPassword,
                 section: _section,
                 onSectionChanged: (section) =>
                     setState(() => _section = section),
@@ -146,11 +172,13 @@ class _AdminLock extends StatelessWidget {
 class _AdminDashboard extends StatelessWidget {
   const _AdminDashboard({
     required this.clientStore,
+    required this.adminPassword,
     required this.section,
     required this.onSectionChanged,
   });
 
   final ClientStore clientStore;
+  final String? adminPassword;
   final _AdminSection section;
   final ValueChanged<_AdminSection> onSectionChanged;
 
@@ -205,7 +233,10 @@ class _AdminDashboard extends StatelessWidget {
               ),
               const SizedBox(height: 28),
               switch (section) {
-                _AdminSection.clients => _ClientList(clientStore: clientStore),
+                _AdminSection.clients => _ClientList(
+                  clientStore: clientStore,
+                  adminPassword: adminPassword,
+                ),
                 _AdminSection.photos => const _EmptyAdminView(
                   icon: Icons.photo_library_outlined,
                   title: 'Aucune photo synchronisée',
@@ -271,14 +302,15 @@ class _SectionButton extends StatelessWidget {
 }
 
 class _ClientList extends StatelessWidget {
-  const _ClientList({required this.clientStore});
+  const _ClientList({required this.clientStore, required this.adminPassword});
 
   final ClientStore clientStore;
+  final String? adminPassword;
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<ClientRecord>>(
-      future: clientStore.getClients(),
+      future: clientStore.getClients(adminPassword: adminPassword),
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return const LinearProgressIndicator(minHeight: 2);

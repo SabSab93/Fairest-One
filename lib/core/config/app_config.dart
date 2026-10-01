@@ -40,6 +40,21 @@ class AppConfig {
     return Duration(seconds: int.tryParse(value) ?? 10);
   }
 
+  static String get dataApiBaseUrl {
+    const buildValue = String.fromEnvironment('DATA_API_BASE_URL');
+    return buildValue.isNotEmpty
+        ? buildValue
+        : _env('DATA_API_BASE_URL', '/api/');
+  }
+
+  static bool get useRemoteData {
+    const buildValue = String.fromEnvironment('USE_REMOTE_DATA');
+    final value = buildValue.isNotEmpty
+        ? buildValue
+        : _env('USE_REMOTE_DATA', 'false');
+    return value.toLowerCase() == 'true' || value == '1';
+  }
+
   static String get adminPasswordHash {
     const buildValue = String.fromEnvironment('ADMIN_PASSWORD_HASH');
     return buildValue.isNotEmpty ? buildValue : _env('ADMIN_PASSWORD_HASH', '');

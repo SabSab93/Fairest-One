@@ -1,0 +1,15 @@
+{
+  "name": "fairest-one-deployment",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build": "bash scripts/vercel-build.sh",
+    "check:api": "node --check api/clients.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.57.4"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

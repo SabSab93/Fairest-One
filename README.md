@@ -144,7 +144,7 @@ flutter test
 
 Le journal de conception et de fabrication est construit avec Docusaurus :
 
-- [Documentation en ligne](https://fairest-one.vercel.app/)
+- [Documentation en ligne](https://documentation-theta-eight.vercel.app/)
 - [Sources de la documentation](documentation/)
 
 Pour lancer le site localement :
@@ -161,6 +161,12 @@ Pour vérifier la version de production :
 npm run typecheck
 npm run build
 ```
+
+## Mise en production
+
+L'application Flutter Web utilise une API Vercel devant Supabase. Le guide
+complet, les variables nécessaires et le SQL de sécurisation sont détaillés
+dans [docs/production-deployment.md](docs/production-deployment.md).
 
 ## Remaining Local Setup
 

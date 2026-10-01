@@ -37,26 +37,26 @@ class _PhotoRecoveryScreenState extends State<PhotoRecoveryScreen> {
     }
 
     setState(() => _isReading = true);
-    final clients = await widget.clientStore.getClients();
-    if (!mounted) return;
+    try {
+      final cardUid = await const DemoCardStore().read();
+      final detectedClient = cardUid == null
+          ? null
+          : await widget.clientStore.findByCardUid(cardUid);
+      if (!mounted) return;
 
-    ClientRecord? detectedClient;
-    for (final client in clients) {
-      if (client.cardUid != null) {
-        detectedClient = client;
-        break;
+      setState(() => _client = detectedClient);
+      if (detectedClient == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Aucune carte client enregistrée.')),
+        );
       }
-    }
-
-    setState(() {
-      _client = detectedClient;
-      _isReading = false;
-    });
-
-    if (detectedClient == null) {
+    } catch (_) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Aucune carte client enregistrée.')),
+        const SnackBar(content: Text('Impossible de rechercher cette carte.')),
       );
+    } finally {
+      if (mounted) setState(() => _isReading = false);
     }
   }
 
