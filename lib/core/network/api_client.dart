@@ -7,7 +7,7 @@ import '../config/app_config.dart';
 class ApiClient {
   ApiClient({http.Client? client, String? baseUrl})
     : _client = client ?? http.Client(),
-      _baseUri = _parseBaseUri(baseUrl ?? AppConfig.apiBaseUrl);
+      _baseUri = _parseBaseUri(baseUrl ?? AppConfig.dataApiBaseUrl);
 
   final http.Client _client;
   final Uri _baseUri;

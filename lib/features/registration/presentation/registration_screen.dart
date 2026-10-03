@@ -71,9 +71,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
       final message = switch (result) {
         ClientSaveResult.created =>
-          AppConfig.useRemoteData
-              ? 'Client et carte NFC enregistrés dans Supabase.'
-              : 'Client et carte NFC enregistrés sur cet appareil.',
+          'Client et carte NFC enregistrés dans Supabase.',
         ClientSaveResult.emailAlreadyExists =>
           'Cette adresse email est déjà enregistrée.',
         ClientSaveResult.cardAlreadyAssigned =>
