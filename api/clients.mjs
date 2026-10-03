@@ -1,4 +1,4 @@
-import {createHash, timingSafeEqual} from 'node:crypto';
+import {timingSafeEqual} from 'node:crypto';
 import {createClient} from '@supabase/supabase-js';
 
 const jsonHeaders = {
@@ -27,12 +27,11 @@ function getSupabaseAdmin() {
 }
 
 function isAdminPasswordValid(password) {
-  const expectedHash = process.env.ADMIN_PASSWORD_HASH;
-  if (!expectedHash || typeof password !== 'string') return false;
+  const expectedPassword = process.env.ADMIN_PASSWORD;
+  if (!expectedPassword || typeof password !== 'string') return false;
 
-  const receivedHash = createHash('sha256').update(password).digest('hex');
-  const expected = Buffer.from(expectedHash, 'utf8');
-  const received = Buffer.from(receivedHash, 'utf8');
+  const expected = Buffer.from(expectedPassword, 'utf8');
+  const received = Buffer.from(password, 'utf8');
   return expected.length === received.length && timingSafeEqual(expected, received);
 }
 

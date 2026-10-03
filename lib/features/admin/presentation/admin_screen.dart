@@ -1,6 +1,3 @@
-import 'dart:convert';
-
-import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -40,41 +37,26 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   Future<void> _unlock() async {
-    if (AppConfig.useRemoteData) {
-      try {
-        await widget.clientStore.getClients(adminPassword: _pinController.text);
-      } on AdminAccessDeniedException {
-        if (mounted) {
-          setState(() => _pinError = 'Mot de passe administrateur incorrect');
-        }
-        return;
-      } catch (_) {
-        if (mounted) {
-          setState(() => _pinError = 'Impossible de joindre le serveur');
-        }
-        return;
+    try {
+      await widget.clientStore.getClients(adminPassword: _pinController.text);
+    } on AdminAccessDeniedException {
+      if (mounted) {
+        setState(() => _pinError = 'Mot de passe administrateur incorrect');
       }
-
-      if (!mounted) return;
-      setState(() {
-        _isUnlocked = true;
-        _adminPassword = _pinController.text;
-        _pinError = null;
-      });
+      return;
+    } catch (_) {
+      if (mounted) {
+        setState(() => _pinError = 'Impossible de joindre le serveur');
+      }
       return;
     }
 
-    final hash = sha256.convert(utf8.encode(_pinController.text)).toString();
-    if (AppConfig.adminPasswordHash.isNotEmpty &&
-        hash == AppConfig.adminPasswordHash) {
-      setState(() {
-        _isUnlocked = true;
-        _pinError = null;
-      });
-      return;
-    }
-
-    setState(() => _pinError = 'Code administrateur incorrect');
+    if (!mounted) return;
+    setState(() {
+      _isUnlocked = true;
+      _adminPassword = _pinController.text;
+      _pinError = null;
+    });
   }
 
   @override
@@ -412,7 +394,7 @@ class _LogView extends StatelessWidget {
         AppConfig.useMockIot ? 'Mode simulation' : 'Mode matériel',
         AppConfig.useMockIot
             ? 'La Raspberry Pi n’est pas encore connectée'
-            : 'Connexion à ${AppConfig.apiBaseUrl}',
+            : 'Connexion à ${AppConfig.mirrorApiBaseUrl}',
       ),
     ];
 

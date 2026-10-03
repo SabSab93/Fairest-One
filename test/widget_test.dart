@@ -1,19 +1,13 @@
 import 'package:fairest_one/app/app.dart';
 import 'package:fairest_one/app/router.dart';
+import 'package:fairest_one/features/admin/presentation/admin_screen.dart';
 import 'package:fairest_one/features/registration/data/client_store.dart';
 import 'package:fairest_one/features/registration/domain/client_record.dart';
 import 'package:fairest_one/features/registration/presentation/registration_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  setUpAll(() {
-    dotenv.loadFromString(
-      envString: 'ADMIN_PASSWORD_HASH=8925260c8cb280b26321501c75eec6ffadccc51f05f1c0c54fd1a4f2a4e46861',
-    );
-  });
-
   setUp(() => appRouter.go('/'));
 
   testWidgets('shows the Fairest One dashboard', (tester) async {
@@ -81,19 +75,18 @@ void main() {
     expect(clientStore.clients.single.email, 'client@exemple.fr');
     expect(clientStore.clients.single.cardUid, startsWith('DEMO-'));
     expect(
-      find.text('Client et carte NFC enregistrés sur cet appareil.'),
+      find.text('Client et carte NFC enregistrés dans Supabase.'),
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('unlocks the administration area with configured password', (
+  testWidgets('unlocks the administration area through the API store', (
     tester,
   ) async {
-    await tester.pumpWidget(const FairestOneApp());
-
-    await tester.ensureVisible(find.text('Administration'));
-    await tester.tap(find.text('Administration'));
+    await tester.pumpWidget(
+      MaterialApp(home: AdminScreen(clientStore: _FakeClientStore())),
+    );
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'iou');
     await tester.tap(find.text('DÉVERROUILLER'));

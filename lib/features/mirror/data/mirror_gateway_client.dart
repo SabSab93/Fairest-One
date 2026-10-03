@@ -15,7 +15,7 @@ enum MirrorCommand {
 
 class MirrorGatewayClient {
   MirrorGatewayClient({ApiClient? apiClient})
-    : _apiClient = apiClient ?? ApiClient();
+    : _apiClient = apiClient ?? ApiClient(baseUrl: AppConfig.mirrorApiBaseUrl);
 
   final ApiClient _apiClient;
 
@@ -27,7 +27,7 @@ class MirrorGatewayClient {
   Future<http.Response> sendCommand(MirrorCommand command) {
     return _apiClient.postJson(
       '/api/v1/mirror/commands',
-      body: {'deviceId': AppConfig.mirrorDeviceId, 'command': command.value},
+      body: {'command': command.value},
     );
   }
 

@@ -49,16 +49,16 @@ This first version focuses on a clean Flutter base:
 - backend configuration placeholder;
 - mock mirror status abstraction.
 
-It does not implement real email sending, Supabase synchronization, cloud photo upload, WebSocket events, or Arduino firmware.
+It does not implement real email sending, cloud photo upload, hardware events,
+or Arduino firmware.
 
 ## Technologies
 
 - Flutter 3
 - Dart
 - go_router for navigation
-- http for a future backend API client
-- shared_preferences for local email storage
-- flutter_dotenv for public device and gateway configuration
+- http for the Vercel API and future Raspberry Pi gateway
+- shared_preferences for the simulated NFC card
 
 ## Project Structure
 
@@ -80,40 +80,28 @@ lib/
 
 ## Configuration
 
-The mobile configuration is stored in `.env`. The committed `.env.example`
-documents every available value:
+L'application Flutter appelle toujours l'API Vercel, qui accède à Supabase.
+Seules trois variables serveur sont nécessaires dans Vercel (Production) :
 
 ```dotenv
-API_BASE_URL=http://raspberrypi.local:8080/
-WS_BASE_URL=ws://raspberrypi.local:8080/ws
-MIRROR_DEVICE_ID=fairest-one-mirror-01
-USE_MOCK_IOT=true
-REQUEST_TIMEOUT_SECONDS=10
 SUPABASE_URL=https://olktukdervvumtjkjuub.supabase.co
-SUPABASE_PUBLISHABLE_KEY=sb_publishable_your_key
-USE_SUPABASE=false
+SUPABASE_SECRET_KEY=sb_secret_a_remplacer
+ADMIN_PASSWORD=iou
 ```
 
-The `.env` file contains public client configuration only. Never put a password,
-private API key, or pairing secret in it because it is bundled into the app.
-
-The Flutter SDK for Supabase is installed. Keep `USE_SUPABASE=false` until
-`docs/supabase-schema.sql` has been executed and secure RLS policies have been
-defined. The `service_role` key must remain on the Raspberry Pi or backend.
-
-Build-time values can still override the file when needed:
+Le fichier `.env` reste ignoré par Git. Quand l'API de la Raspberry Pi sera
+connue, son adresse sera fournie au build Flutter :
 
 ```sh
-flutter run --dart-define=API_BASE_URL=http://192.168.1.50:8080/
+flutter run --dart-define=MIRROR_API_URL=http://raspberrypi.local:8080/
 ```
 
 See [docs/iot-architecture.md](docs/iot-architecture.md) for the Raspberry Pi,
 Arduino, network, and API plan.
 
 The Supabase tables are defined in
-[docs/supabase-schema.sql](docs/supabase-schema.sql). The schema has been
-executed on the project; secure RLS policies still need to be added before
-enabling Supabase in the application.
+[docs/supabase-schema.sql](docs/supabase-schema.sql). Flutter never receives
+the Supabase secret: only the Vercel API accesses the database.
 
 ## Install Dependencies
 
