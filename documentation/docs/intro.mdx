@@ -7,29 +7,29 @@ description: Point de départ du journal de conception et de fabrication de Fair
 
 # Construire Fairest One
 
-Fairest One est un projet étudiant de Master 2 autour de l'IoT et des systèmes embarqués. Le prototype prend la forme d'un miroir connecté destiné aux opticiens.
+Fairest One est un projet étudiant réalisé en deuxième année de MBA dans le cadre d'un cours consacré aux objets connectés et aux systèmes embarqués.
+
+L'idée est née d'une difficulté rencontrée par Valérie lors d'un essayage de lunettes. Lorsqu'un client essaie seul plusieurs montures, il doit se photographier lui-même et dispose de peu de recul pour les comparer. Nous avons donc imaginé un miroir connecté capable de prendre automatiquement des photos afin de faciliter la comparaison et de laisser davantage de temps à la réflexion.
+
+Le prototype s'adresse ainsi aux clients d'un magasin d'optique pendant leurs essayages.
 
 Le parcours envisagé associe une adresse e-mail à une carte RFID/NFC. Devant le miroir, le client présente sa carte, déclenche une séquence de prise de vue et peut ensuite retrouver ses photos depuis une borne.
 
-## Ce que documente ce site
+## Documentation technique
 
-Ce site suit la construction du prototype, depuis l'idée initiale jusqu'au montage final. Il rassemble les décisions, les dimensions, les essais et les éléments nécessaires pour comprendre la démarche.
+Cette documentation technique présente la construction du prototype, depuis l'idée initiale jusqu'au montage final. Elle rassemble les décisions, les dimensions, les essais et les éléments nécessaires pour comprendre la démarche suivie.
 
-| Étape | Contenu | État documentaire |
-|---|---|---|
-| 01 | Idée et inspirations | À compléter avec les sources |
-| 02 | Composants et budget | BOM renseigné |
-| 03 | Relevés dimensionnels | En attente des mesures et photos constructeur |
-| 04 | Esquisses papier | En attente des photographies |
-| 05 | Conception Fusion 360 | En attente des captures et explications |
-| 06 | Pièces pour impression 3D | En attente des rendus et explications |
-| 07 | Impression 3D | En attente des photographies et réglages |
-| 08 | Électronique et Arduino | En attente du schéma et du code |
-| 09 | Montage final | En attente des photographies d'assemblage |
-
-:::note Principe éditorial
-Les emplacements non renseignés sont volontairement laissés vides. Ils seront complétés uniquement avec les photographies, sources et explications réelles du projet.
-:::
+| Étape | Contenu                   |
+| ----- | ------------------------- |
+| 01    | Idée et inspirations      |
+| 02    | Composants et budget      |
+| 03    | Relevés dimensionnels     |
+| 04    | Esquisses papier          |
+| 05    | Conception Fusion 360     |
+| 06    | Pièces pour impression 3D |
+| 07    | Impression 3D             |
+| 08    | Électronique et Arduino   |
+| 09    | Montage final             |
 
 ## Architecture envisagée
 
@@ -37,8 +37,6 @@ Les emplacements non renseignés sont volontairement laissés vides. Ils seront 
 Application Flutter <-> Backend / API <-> ESP32
 ```
 
-Les communications pourront évoluer entre HTTP/REST, WebSocket ou MQTT. Le choix définitif n'est pas encore arrêté.
-
-## Parcours du site
+## Parcours de la documentation
 
 Commencez par [l'idée de départ](./idee-et-inspirations), puis suivez les étapes dans l'ordre du menu.
