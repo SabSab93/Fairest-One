@@ -305,3 +305,13 @@ table td {
     overflow-x: auto;
   }
 }
+
+/* Keep the complete brand mark readable in the site header. */
+.navbar__logo {
+  height: 54px;
+}
+.navbar__logo img {
+  width: 108px;
+  height: 54px;
+  object-fit: contain;
+}

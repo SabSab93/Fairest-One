@@ -46,7 +46,8 @@ const config: Config = {
       respectPrefersColorScheme: false,
     },
     navbar: {
-      title: 'FAIREST ONE',
+      title: '',
+      logo: {alt: 'Fairest One', src: 'img/logo.png', width: 140, height: 66},
       items: [
         {
           type: 'docSidebar',

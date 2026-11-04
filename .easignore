@@ -1,0 +1,21 @@
+# EAS archive allowlist: backend, Flutter, firmware and local secrets stay on Mac.
+/*
+!/mobile/
+/mobile/*
+!/mobile/package.json
+!/mobile/package-lock.json
+!/mobile/app.json
+!/mobile/eas.json
+!/mobile/tsconfig.json
+!/mobile/src/
+!/mobile/assets/
+!/mobile/scripts/
+/mobile/assets/*
+!/mobile/assets/icon.png
+!/mobile/assets/logo.png
+!/mobile/assets/fonts/
+**/.env*
+**/node_modules/
+**/.expo/
+**/*.key
+**/*.pem
