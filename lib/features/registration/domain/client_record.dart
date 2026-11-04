@@ -5,6 +5,7 @@ class ClientRecord {
     required this.cardUid,
     required this.photoCount,
     required this.createdAt,
+    this.messages = const [],
   });
 
   final String id;
@@ -12,6 +13,7 @@ class ClientRecord {
   final String? cardUid;
   final int photoCount;
   final DateTime createdAt;
+  final List<String> messages;
 
   factory ClientRecord.fromJson(Map<String, Object?> json) {
     return ClientRecord(
@@ -20,6 +22,7 @@ class ClientRecord {
       cardUid: json['cardUid'] as String?,
       photoCount: json['photoCount'] as int? ?? 0,
       createdAt: DateTime.parse(json['createdAt']! as String),
+      messages: (json['messages'] as List?)?.cast<String>() ?? const [],
     );
   }
 
@@ -30,6 +33,7 @@ class ClientRecord {
       'cardUid': cardUid,
       'photoCount': photoCount,
       'createdAt': createdAt.toIso8601String(),
+      'messages': messages,
     };
   }
 }

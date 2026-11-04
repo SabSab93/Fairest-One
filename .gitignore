@@ -52,3 +52,6 @@ app.*.map.json
 .vercel/
 .vercel-cache/
 node_modules/
+
+# Local hardware credentials
+firmware/fairest_one/config.h

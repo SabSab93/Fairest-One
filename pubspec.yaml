@@ -10,6 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   go_router: ^18.0.2
+  flutter_blue_plus: 2.3.14
   http: ^1.6.0
   shared_preferences: ^2.5.5
 

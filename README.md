@@ -10,54 +10,27 @@ The name refers to:
 
 > Mirror, mirror on the wall, who is the fairest one of all?
 
-The final system is planned as three separated parts. The backend is not
-required during the current local prototype phase:
+The current hardware integration uses the existing Flutter application, Vercel API and Supabase database:
 
 ```text
-Application Flutter
-|
-v
-Raspberry Pi / API locale
-|
-v
-Arduino / Smart Mirror
-|
-+-- RC522
-+-- OV5640
-+-- LEDs
-+-- Buzzer
+RC522 / RGB LED / buzzer ↔ ESP32-C6 ↔ BLE ↔ Flutter iPhone ↔ HTTPS ↔ Vercel ↔ Supabase
 ```
 
-The mobile app does not depend on native NFC. RFID/NFC card reading is expected to be handled by the mirror electronics.
+USB connects the ESP32 to the Mac for programming and logs only. The ESP32 uses no Wi-Fi. Flutter needs Internet to access the existing backend.
 
-The future backend will synchronize clients and sessions between devices,
-store photos centrally, send emails, authenticate opticians, and communicate
-with the connected mirror. Until those features are needed, client emails are
-stored only on the device.
+See [the BLE integration guide](docs/ble-integration.md) for the repository audit, complete protocol, configuration, SQL migration requiring validation, and the exact iPhone/two-card test sequence. The complete Arduino program is in [firmware/fairest_one/fairest_one.ino](firmware/fairest_one/fairest_one.ino). Nothing is automatically deployed or applied to a remote database.
 
 ## Current Scope
 
-This first version focuses on a clean Flutter base:
-
-- modern minimal UI inspired by a refined app-cover style;
-- responsive dashboard for iPhone and Android tablets;
-- new-session flow with email and simulated NFC card association;
-- photo-recovery flow prepared for the Raspberry Pi RFID reader;
-- persistent local client storage with duplicate prevention;
-- PIN-protected administration for clients, photos, and device logs;
-- router setup;
-- backend configuration placeholder;
-- mock mirror status abstraction.
-
-It does not implement real email sending, cloud photo upload, hardware events,
-or Arduino firmware.
+The existing screens cover registration, recovery and administrator access. The BLE integration adds physical NFC association, backend-verified try-ons, simulated capture messages and session recovery. Real camera uploads and email delivery remain future work.
 
 ## Technologies
 
 - Flutter 3
 - Dart
 - go_router for navigation
-- http for the Vercel API and future Raspberry Pi gateway
+- http for the existing Vercel API
+- flutter_blue_plus 2.3.14 for iOS BLE
 - shared_preferences for the simulated NFC card
 
 ## Project Structure
@@ -80,28 +53,15 @@ lib/
 
 ## Configuration
 
-L'application Flutter appelle toujours l'API Vercel, qui accède à Supabase.
-Seules trois variables serveur sont nécessaires dans Vercel (Production) :
+Use a test Vercel API and Supabase project first. Server-only variables are listed in [.env.example](.env.example). The private hardware signing key belongs only in Vercel and the ignored Arduino `config.h`, never in Flutter.
 
-```dotenv
-SUPABASE_URL=https://olktukdervvumtjkjuub.supabase.co
-SUPABASE_SECRET_KEY=sb_secret_a_remplacer
-ADMIN_PASSWORD=iou
-```
-
-Le fichier `.env` reste ignoré par Git. Quand l'API de la Raspberry Pi sera
-connue, son adresse sera fournie au build Flutter :
+Run the native iPhone application with the public API URL:
 
 ```sh
-flutter run --dart-define=MIRROR_API_URL=http://raspberrypi.local:8080/
+flutter run -d <IPHONE_ID> --dart-define=APP_API_URL=https://YOUR_PREVIEW.vercel.app/api/
 ```
 
-See [docs/iot-architecture.md](docs/iot-architecture.md) for the Raspberry Pi,
-Arduino, network, and API plan.
-
-The Supabase tables are defined in
-[docs/supabase-schema.sql](docs/supabase-schema.sql). Flutter never receives
-the Supabase secret: only the Vercel API accesses the database.
+Review [docs/supabase-nfc.sql](docs/supabase-nfc.sql) against the actual test database before applying it. Follow [docs/ble-integration.md](docs/ble-integration.md) for pairing, wiring and validation. The original schema is [docs/supabase-schema.sql](docs/supabase-schema.sql).
 
 ## Install Dependencies
 
@@ -112,7 +72,7 @@ flutter pub get
 ## Run
 
 ```sh
-flutter run
+flutter run --dart-define=APP_API_URL=https://YOUR_PREVIEW.vercel.app/api/
 ```
 
 ## Verify Environment
@@ -126,6 +86,8 @@ flutter doctor -v
 ```sh
 flutter analyze
 flutter test
+npm run check:api
+npm run test:api
 ```
 
 ## Documentation du prototype

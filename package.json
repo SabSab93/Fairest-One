@@ -4,7 +4,8 @@
   "version": "1.0.0",
   "scripts": {
     "build": "bash scripts/vercel-build.sh",
-    "check:api": "node --check api/clients.mjs"
+    "check:api": "node --check api/clients.mjs",
+    "test:api": "node --test test/api/*.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4"

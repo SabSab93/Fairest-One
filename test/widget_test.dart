@@ -1,4 +1,5 @@
 import 'package:fairest_one/app/app.dart';
+import 'package:fairest_one/core/config/app_config.dart';
 import 'package:fairest_one/app/router.dart';
 import 'package:fairest_one/features/admin/presentation/admin_screen.dart';
 import 'package:fairest_one/features/registration/data/client_store.dart';
@@ -15,7 +16,12 @@ void main() {
 
     expect(find.text('Tableau de bord'), findsOneWidget);
     expect(find.text('Nouvelle session'), findsOneWidget);
-    expect(find.textContaining('Miroir prêt'), findsOneWidget);
+    expect(
+      find.textContaining(
+        AppConfig.useMockIot ? 'Miroir prêt' : 'Miroir BLE déconnecté',
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('dashboard fits a mobile viewport', (tester) async {
@@ -37,7 +43,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Récupérer\nmes photos'), findsOneWidget);
-    expect(find.text('SIMULER LA CARTE'), findsOneWidget);
+    expect(
+      find.text(AppConfig.useMockIot ? 'SIMULER LA CARTE' : 'LIRE LA CARTE'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('validates email on registration screen', (tester) async {
@@ -59,7 +68,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     await tester.pumpWidget(
-      MaterialApp(home: RegistrationScreen(clientStore: clientStore)),
+      MaterialApp(
+        home: RegistrationScreen(clientStore: clientStore, useMockIot: true),
+      ),
     );
     await tester.pumpAndSettle();
 

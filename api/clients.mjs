@@ -1,4 +1,4 @@
-import {timingSafeEqual} from 'node:crypto';
+import {randomBytes, createHash, createHmac, timingSafeEqual} from 'node:crypto';
 import {createClient} from '@supabase/supabase-js';
 
 const jsonHeaders = {
@@ -126,31 +126,70 @@ async function createClientRecord(request, supabase) {
   return json({created: true}, 201);
 }
 
-export default {
+// Flutter relays BLE proofs; the dedicated mirror key never reaches the app.
+export async function handleNfc(request, supabase, body) {
+  const action = body?.action;
+  const deviceId = process.env.MIRROR_DEVICE_ID;
+  const key = process.env.MIRROR_SIGNING_KEY;
+  if (!deviceId || !key || key.length < 32) return json({error: 'Configuration miroir incomplète.'}, 503);
+  if (!['begin_registration','begin_recovery','begin_recognition','scan','capture','cancel'].includes(action)) {
+    return json({error: 'Action inconnue.'}, 400);
+  }
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  if (action === 'begin_registration' && (email.length > 254 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))) {
+    return json({error: 'Adresse e-mail invalide.'}, 400);
+  }
+  const generated = action.startsWith('begin_');
+  const token = generated ? randomBytes(32).toString('hex') : body.token;
+  if (typeof token !== 'string' || !/^[0-9a-f]{64}$/.test(token)) return json({error: 'Jeton invalide.'}, 400);
+  const uid = typeof body.card_uid === 'string' ? body.card_uid.toUpperCase() : '';
+  if (['scan','capture'].includes(action)) {
+    if (!/^(?:[0-9A-F]{8}|[0-9A-F]{14}|[0-9A-F]{20})$/.test(uid) ||
+        typeof body.proof !== 'string' || !/^[0-9a-f]{64}$/.test(body.proof)) {
+      return json({error: 'Lecture signée invalide.'}, 400);
+    }
+    const expected = createHmac('sha256', key).update(`${token}|${uid}|${action}`).digest();
+    if (!timingSafeEqual(expected, Buffer.from(body.proof, 'hex'))) return json({error: 'Preuve miroir invalide.'}, 401);
+  }
+  const {data, error} = await supabase.rpc('nfc_operation', {
+    p_action: action, p_device: deviceId,
+    p_hash: createHash('sha256').update(token).digest('hex'), p_email: email, p_uid: uid,
+  });
+  if (error) {
+    console.error('NFC operation failed:', error.code);
+    return json({error: 'Service NFC indisponible.'}, 502);
+  }
+  if (data.error) return json(data, data.status ?? 409);
+  return json({...data, ...(generated ? {token} : {})});
+}
+
+export function createHandler(supabaseFactory = getSupabaseAdmin) {
+ return {
   async fetch(request) {
-    if (request.method === 'OPTIONS') {
-      return new Response(null, {status: 204});
-    }
-
-    let supabase;
-    try {
-      supabase = getSupabaseAdmin();
-    } catch (error) {
-      console.error(error.message);
-      return json({error: 'Configuration serveur incomplète.'}, 503);
-    }
-
+    if (request.method === 'OPTIONS') return new Response(null, {status: 204});
+    if (!['GET', 'POST'].includes(request.method)) return json({error: 'Méthode non autorisée.'}, 405);
+    let body;
     if (request.method === 'POST') {
-      return createClientRecord(request, supabase);
+      try { body = await request.clone().json(); }
+      catch { return json({error: 'Corps JSON invalide.'}, 400); }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return json({error: 'Corps JSON invalide.'}, 400);
     }
-
-    if (request.method === 'GET') {
+    // Legacy demo operations remain available to administrators only.
+    if (!body?.action && !isAdminPasswordValid(request.headers.get('x-admin-password'))) {
+      return json({error: 'Accès administrateur refusé.'}, 401);
+    }
+    let supabase;
+    try { supabase = supabaseFactory(); }
+    catch { return json({error: 'Configuration serveur incomplète.'}, 503); }
+    try {
+      if (body?.action) return await handleNfc(request, supabase, body);
+      if (request.method === 'POST') return await createClientRecord(request, supabase);
       const cardUid = new URL(request.url).searchParams.get('card_uid');
-      return cardUid
-        ? findClientByCard(cardUid, supabase)
-        : listClients(request, supabase);
+      return cardUid ? await findClientByCard(cardUid, supabase) : await listClients(request, supabase);
+    } catch {
+      return json({error: 'Service indisponible.'}, 502);
     }
-
-    return json({error: 'Méthode non autorisée.'}, 405);
   },
-};
+ };
+}
+export default createHandler();

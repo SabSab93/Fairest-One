@@ -26,13 +26,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsLocalNetworking</key>
-		<true/>
-	</dict>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>Fairest One se connecte au miroir et à sa Raspberry Pi sur le réseau local.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Fairest One utilise le Bluetooth pour lire les cartes NFC sur votre miroir et simuler les captures.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
