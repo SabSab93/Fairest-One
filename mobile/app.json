@@ -1,0 +1,62 @@
+{
+  "expo": {
+    "name": "Fairest One",
+    "slug": "fairest-one",
+    "version": "1.0.0",
+    "scheme": "fairest-one",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.fairestone.expo",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.fairestone.expo",
+      "permissions": [
+        "android.permission.NFC",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_CONNECT"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/icon.png",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": true
+        }
+      ],
+      [
+        "react-native-nfc-manager",
+        {
+          "nfcPermission": "Fairest One lit votre carte NFC pour inscrire et retrouver votre session.",
+          "includeNdefEntitlement": false
+        }
+      ],
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": false,
+          "neverForLocation": true,
+          "bluetoothAlwaysPermission": "Fairest One se connecte au miroir pour déclencher et enregistrer les captures simulées."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "4e1ed398-0f6f-4c39-9841-94f4fbaf5c38"
+      }
+    },
+    "owner": "sabristiti"
+  }
+}

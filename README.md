@@ -4,6 +4,10 @@ Fairest One is a student Master 2 project about IoT and embedded systems for opt
 
 The goal is to prepare a connected smart mirror experience: a client tries several frames, the mirror captures each try-on, and the selected photos can later be sent by email.
 
+## Application Expo / EAS
+
+La version mobile React Native est préparée dans [`mobile/`](mobile/README.md), avec inscription/récupération NFC native et miroir BLE pour Android et iOS. Le guide contient les étapes de création des versions EAS de test. Flutter et le backend existants restent disponibles. Aucun déploiement ni changement de base distante n’est automatique.
+
 ## Concept
 
 The name refers to:

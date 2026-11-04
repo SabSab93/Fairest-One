@@ -47,6 +47,7 @@ const config: Config = {
     },
     navbar: {
       title: 'FAIREST ONE',
+      logo: {alt: '', src: 'img/favicon.png', width: 40, height: 40},
       items: [
         {
           type: 'docSidebar',
