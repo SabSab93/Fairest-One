@@ -133,13 +133,13 @@ const phoneActions = new Map([
   ['phone_cancel', 'cancel'],
 ]);
 
-// Native iPhone calls cannot carry a mirror proof. They use a personal,
-// random Keychain credential instead; knowledge of an NFC UID grants no reads.
+// Native Android/iOS calls cannot carry a mirror proof. They use a personal,
+// random device-local credential instead; knowledge of an NFC UID grants no reads.
 export async function handlePhoneNfc(supabase, body) {
   const action = phoneActions.get(body.action);
   const access = body.mobile_token;
   if (typeof access !== 'string' || !/^[0-9a-f]{64}$/.test(access)) {
-    return json({error: 'Accès personnel de cet iPhone requis.'}, 401);
+    return json({error: 'Accès personnel de ce téléphone requis.'}, 401);
   }
   const generated = action.startsWith('begin_');
   const token = generated ? randomBytes(32).toString('hex') : body.token;

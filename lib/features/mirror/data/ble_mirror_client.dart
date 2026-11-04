@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:flutter/foundation.dart';
 
 const fairestServiceUuid = '83de1000-7a28-4b54-9815-47c0ae451001';
 const fairestEventsUuid = '83de1001-7a28-4b54-9815-47c0ae451001';
@@ -54,6 +55,14 @@ class BleMirrorClient implements MirrorBleTransport {
   Future<void> connect() async {
     if (_device?.isConnected == true && _commands != null) return;
     await disconnect();
+    if (!await FlutterBluePlus.isSupported) {
+      throw StateError('Ce téléphone ne dispose pas du Bluetooth compatible.');
+    }
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      // Bootstrap CONNECT permission before reading adapterState on Android 12+.
+      // Otherwise it can stay "unknown" and the scan dialog is never reached.
+      await FlutterBluePlus.turnOn(timeout: 20);
+    }
     final adapter = await FlutterBluePlus.adapterState
         .where((s) => s != BluetoothAdapterState.unknown)
         .first
@@ -77,6 +86,7 @@ class BleMirrorClient implements MirrorBleTransport {
     try {
       await FlutterBluePlus.startScan(
         withServices: [Guid(fairestServiceUuid)],
+        androidCheckLocationServices: false,
         timeout: const Duration(seconds: 10),
       );
       _device = await found.future.timeout(const Duration(seconds: 12));

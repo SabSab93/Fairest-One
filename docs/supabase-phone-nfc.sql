@@ -16,7 +16,7 @@ declare
   result jsonb;
 begin
   if p_access_hash is null or p_access_hash !~ '^[0-9a-f]{64}$' then
-    return jsonb_build_object('error','Accès personnel de cet iPhone requis.','status',401);
+    return jsonb_build_object('error','Accès personnel de ce téléphone requis.','status',401);
   end if;
   if p_action in ('begin_registration','begin_recovery') then
     result := public.nfc_operation(p_action,'native-ios',p_hash,p_email,p_uid);
@@ -34,7 +34,7 @@ begin
     return jsonb_build_object('error','Demande expirée. Relancez la lecture.','status',410);
   end if;
   if r.mobile_access_hash is distinct from p_access_hash then
-    return jsonb_build_object('error','Accès refusé. Utilisez l’iPhone de l’inscription.','status',403);
+    return jsonb_build_object('error','Accès refusé. Utilisez le téléphone de l’inscription.','status',403);
   end if;
   if p_action='cancel' then
     return public.nfc_operation('cancel','native-ios',p_hash);
@@ -53,7 +53,7 @@ begin
   ) then
     update public.nfc_requests set state='consumed',card_uid=p_uid where id=r.id;
     -- Same response for unknown UID, old BLE-only enrollment and another owner.
-    return jsonb_build_object('error','Accès refusé. Utilisez l’iPhone ayant inscrit cette carte.','status',403);
+    return jsonb_build_object('error','Accès refusé. Utilisez le téléphone ayant inscrit cette carte.','status',403);
   end if;
   result := public.nfc_operation('scan','native-ios',p_hash,'',p_uid);
   if r.kind='registration' and result->>'state'='associated' then

@@ -15,9 +15,10 @@ String newPhoneAccessToken() {
   ).join();
 }
 
-/// Personal runtime credential, never a Supabase/admin/mirror server key.
-class KeychainPhoneAccessStore implements PhoneAccessStore {
-  const KeychainPhoneAccessStore();
+/// Personal credential: iOS Keychain / encrypted Android storage backed by Keystore.
+/// Never a Supabase, administrator or mirror server key.
+class SecurePhoneAccessStore implements PhoneAccessStore {
+  const SecurePhoneAccessStore();
   static const _key = 'fairest_one.phone_access.v1';
   static const _storage = FlutterSecureStorage(
     iOptions: IOSOptions(

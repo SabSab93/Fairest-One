@@ -13,12 +13,12 @@ The name refers to:
 The current hardware integration uses the existing Flutter application, Vercel API and Supabase database:
 
 ```text
-RC522 / RGB LED / buzzer ↔ ESP32-C6 ↔ BLE ↔ Flutter iPhone ↔ HTTPS ↔ Vercel ↔ Supabase
+RC522 / RGB LED / buzzer ↔ ESP32-C6 ↔ BLE ↔ Flutter Android / iOS ↔ HTTPS ↔ Vercel ↔ Supabase
 ```
 
 USB connects the ESP32 to the Mac for programming and logs only. The ESP32 uses no Wi-Fi. Flutter needs Internet to access the existing backend.
 
-Registration and recovery now read the card directly on the iPhone; see [the native NFC setup guide](docs/iphone-native-nfc.md) for setup, Keychain authorization and the additional migration. Mirror captures continue over BLE.
+Registration and recovery read the card directly on Android and iOS. Start with [the Android testing guide](docs/android-native-nfc.md); see [the native NFC setup guide](docs/iphone-native-nfc.md) for setup, Keychain authorization and the additional migration. Mirror captures continue over BLE.
 
 See [the BLE integration guide](docs/ble-integration.md) for the repository audit, complete protocol, configuration, SQL migration requiring validation, and the exact iPhone/two-card test sequence. The complete Arduino program is in [firmware/fairest_one/fairest_one.ino](firmware/fairest_one/fairest_one.ino). Nothing is automatically deployed or applied to a remote database.
 
@@ -33,8 +33,8 @@ The existing screens cover registration, recovery and administrator access. The 
 - go_router for navigation
 - http for the existing Vercel API
 - flutter_blue_plus 2.3.14 for iOS BLE
-- nfc_manager 4.2.1 for native iPhone card reading
-- flutter_secure_storage 10.3.1 for personal Keychain access
+- nfc_manager 4.2.1 for native Android/iOS card reading
+- flutter_secure_storage 10.3.1 for personal access stored securely on each phone
 - shared_preferences for the simulated NFC card
 
 ## Project Structure
