@@ -308,10 +308,10 @@ table td {
 
 /* Keep the complete brand mark readable in the site header. */
 .navbar__logo {
-  height: 54px;
+  height: 40px;
 }
 .navbar__logo img {
-  width: 108px;
-  height: 54px;
+  width: 40px;
+  height: 40px;
   object-fit: contain;
 }

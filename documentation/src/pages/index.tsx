@@ -35,7 +35,7 @@ export default function Home(): ReactNode {
         <section className={styles.hero}>
           <div className={styles.heroInner}>
             <p className={styles.eyebrow}>MIROIR CONNECTÉ · MASTER 2</p>
-            <Heading as="h1"><img className={styles.heroLogo} src={useBaseUrl('img/logo.png')} alt="Fairest One" width="1775" height="887" /></Heading>
+            <Heading as="h1"><img className={styles.heroLogo} src={useBaseUrl('img/logo.png')} alt="Fairest One" width="1774" height="887" /></Heading>
             <p className={styles.lead}>
               Journal de conception d’un miroir connecté pour accompagner
               l’essayage de lunettes.
