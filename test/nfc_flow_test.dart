@@ -108,8 +108,16 @@ void main() {
         await tester.pumpWidget(
           MaterialApp(
             home: recovery
-                ? PhotoRecoveryScreen(nfcController: flow, useMockIot: false)
-                : RegistrationScreen(nfcController: flow, useMockIot: false),
+                ? PhotoRecoveryScreen(
+                    nfcController: flow,
+                    useMockIot: false,
+                    usePhoneNfc: false,
+                  )
+                : RegistrationScreen(
+                    nfcController: flow,
+                    useMockIot: false,
+                    usePhoneNfc: false,
+                  ),
           ),
         );
         if (!recovery) {

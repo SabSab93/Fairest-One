@@ -27,7 +27,7 @@ Le guide complet est `docs/ble-integration.md` : audit, UUID du service BLE, pro
 
 ## Fonctionnement
 
-Flutter obtient un défi temporaire du backend et arme le lecteur par BLE. Le RC522 lit l'UID ; le firmware signe cette lecture et la transmet à Flutter. Le backend décide de l'association, de la reconnaissance ou de la récupération.
+Flutter obtient un défi temporaire du backend et arme le lecteur par BLE. Le RC522 lit l'UID ; le firmware signe cette lecture et la transmet à Flutter. Le backend décide de la reconnaissance au miroir. L’inscription et la récupération se font désormais directement avec le NFC de l’iPhone ; le guide correspondant est `docs/iphone-native-nfc.md`. L’ancien parcours entièrement BLE reste disponible avec `USE_PHONE_NFC=false`.
 
 Pour un essayage reconnu, Flutter autorise la capture : LED verte, deux bips, compte à rebours 3/2/1 et événement de capture simulée. Flutter enregistre le message côté backend. Une carte inconnue entraîne LED rouge et trois bips, sans capture. Déconnexion, annulation ou absence de réponse arrêtent l'opération. Retirer la carte entre deux lectures.
 

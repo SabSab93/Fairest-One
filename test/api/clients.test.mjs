@@ -51,3 +51,37 @@ test('bad input, invalid proof, expiration and backend failures stay explicit', 
   assert.equal(response.status,502);
   assert.ok(!(await response.text()).includes('secret-details'));
 });
+
+test('native phone challenges require a personal credential and no mirror key', async () => {
+  const oldKey = process.env.MIRROR_SIGNING_KEY;
+  delete process.env.MIRROR_SIGNING_KEY;
+  const access='b'.repeat(64);
+  let called;
+  const handler=createHandler(() => ({rpc:async (name,args) => {called={name,args};return {data:{state:'pending'}};}}));
+  try {
+    assert.equal((await handler.fetch(request({action:'begin_phone_registration',email:'client@example.test'}))).status,401);
+    const response=await handler.fetch(request({action:'begin_phone_registration',email:'CLIENT@EXAMPLE.TEST',mobile_token:access}));
+    const body=await response.json();
+    assert.equal(response.status,200);
+    assert.match(body.token,/^[0-9a-f]{64}$/);
+    assert.equal(called.name,'phone_nfc_operation');
+    assert.equal(called.args.p_action,'begin_registration');
+    assert.equal(called.args.p_access_hash,createHash('sha256').update(access).digest('hex'));
+    assert.equal(called.args.p_email,'client@example.test');
+    assert.ok(!JSON.stringify(body).includes(access));
+    assert.ok(!JSON.stringify(called.args).includes(access));
+  } finally { process.env.MIRROR_SIGNING_KEY=oldKey; }
+});
+
+test('native scans validate inputs and keep authorization failures private', async () => {
+  let calls=0;
+  const handler=createHandler(() => ({rpc:async () => {calls++;return {data:{error:'Accès refusé.',status:403}};}}));
+  const valid={action:'phone_scan',token,mobile_token:'b'.repeat(64),card_uid:'04A1B2C3D4E5F6'};
+  assert.equal((await handler.fetch(request({...valid,mobile_token:undefined}))).status,401);
+  assert.equal((await handler.fetch(request({...valid,card_uid:'DEMO-123'}))).status,400);
+  assert.equal((await handler.fetch(request({...valid,token:'invalid'}))).status,400);
+  assert.equal((await handler.fetch(request(valid))).status,403);
+  assert.equal(calls,1);
+  // An ordinary mirror scan still demands its signed hardware proof.
+  assert.equal((await handler.fetch(request({...valid,action:'scan'}))).status,400);
+});

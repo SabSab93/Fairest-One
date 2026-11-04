@@ -13,5 +13,9 @@ class AppConfig {
     'USE_MOCK_IOT',
     defaultValue: false,
   );
+  static const usePhoneNfc = bool.fromEnvironment(
+    'USE_PHONE_NFC',
+    defaultValue: true,
+  );
   static const requestTimeout = Duration(seconds: 10);
 }
