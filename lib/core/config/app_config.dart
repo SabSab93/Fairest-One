@@ -6,9 +6,12 @@ class AppConfig {
     defaultValue: '/api/',
   );
 
-  // Empty until the Raspberry Pi HTTP API is available.
+  // Legacy gateway remains available for existing command integrations.
   static const mirrorApiBaseUrl = String.fromEnvironment('MIRROR_API_URL');
 
-  static bool get useMockIot => mirrorApiBaseUrl.isEmpty;
+  static const useMockIot = bool.fromEnvironment(
+    'USE_MOCK_IOT',
+    defaultValue: false,
+  );
   static const requestTimeout = Duration(seconds: 10);
 }

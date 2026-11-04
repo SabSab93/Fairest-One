@@ -4,40 +4,60 @@ import 'package:go_router/go_router.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../registration/data/client_store.dart';
+import '../../mirror/data/nfc_flow_controller.dart';
 import '../../registration/domain/client_record.dart';
 
 class PhotoRecoveryScreen extends StatefulWidget {
   const PhotoRecoveryScreen({
     super.key,
     this.clientStore = const ConfiguredClientStore(),
+    this.nfcController,
+    this.useMockIot = AppConfig.useMockIot,
   });
 
   static const String routeName = 'photo-recovery';
 
   final ClientStore clientStore;
+  final NfcFlowController? nfcController;
+  final bool useMockIot;
 
   @override
   State<PhotoRecoveryScreen> createState() => _PhotoRecoveryScreenState();
 }
 
 class _PhotoRecoveryScreenState extends State<PhotoRecoveryScreen> {
+  NfcFlowController get _nfc =>
+      widget.nfcController ?? NfcFlowController.instance;
   ClientRecord? _client;
   bool _isReading = false;
 
   Future<void> _readCard() async {
     if (_isReading) return;
 
-    if (!AppConfig.useMockIot) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('En attente du lecteur RFID de la Raspberry Pi.'),
-        ),
-      );
-      return;
-    }
-
     setState(() => _isReading = true);
     try {
+      if (!widget.useMockIot) {
+        setState(() => _client = null);
+        final result = await _nfc.read('recovery');
+        if (!mounted) return;
+        if (result['state'] == 'recovered') {
+          final row = result['client'] as Map<String, dynamic>;
+          setState(
+            () => _client = ClientRecord(
+              id: row['id'] as String,
+              email: row['email'] as String,
+              cardUid: row['card_uid'] as String?,
+              photoCount: (row['photo_count'] as num).toInt(),
+              createdAt: DateTime.parse(row['created_at'] as String),
+              messages: (row['messages'] as List).cast<String>(),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(_nfc.status.value)));
+        }
+        return;
+      }
       final cardUid = await const DemoCardStore().read();
       final detectedClient = cardUid == null
           ? null
@@ -53,11 +73,23 @@ class _PhotoRecoveryScreenState extends State<PhotoRecoveryScreen> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossible de rechercher cette carte.')),
+        SnackBar(
+          content: Text(
+            widget.useMockIot
+                ? 'Impossible de rechercher cette carte.'
+                : _nfc.status.value,
+          ),
+        ),
       );
     } finally {
       if (mounted) setState(() => _isReading = false);
     }
+  }
+
+  @override
+  void dispose() {
+    if (!widget.useMockIot) _nfc.stop();
+    super.dispose();
   }
 
   @override
@@ -93,7 +125,14 @@ class _PhotoRecoveryScreenState extends State<PhotoRecoveryScreen> {
                     client: _client,
                     isReading: _isReading,
                     onRead: _readCard,
+                    useMockIot: widget.useMockIot,
                   ),
+                  if (_isReading && !widget.useMockIot)
+                    ValueListenableBuilder<String>(
+                      valueListenable: _nfc.status,
+                      builder: (context, value, _) =>
+                          Semantics(liveRegion: true, child: Text(value)),
+                    ),
                   if (_client != null) ...[
                     const SizedBox(height: 28),
                     _PhotoResult(client: _client!),
@@ -113,11 +152,13 @@ class _ReaderPanel extends StatelessWidget {
     required this.client,
     required this.isReading,
     required this.onRead,
+    required this.useMockIot,
   });
 
   final ClientRecord? client;
   final bool isReading;
   final VoidCallback onRead;
+  final bool useMockIot;
 
   @override
   Widget build(BuildContext context) {
@@ -152,7 +193,7 @@ class _ReaderPanel extends StatelessWidget {
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
-            if (!isDetected) ...[
+            ...[
               const SizedBox(height: 22),
               OutlinedButton.icon(
                 onPressed: isReading ? null : onRead,
@@ -162,9 +203,7 @@ class _ReaderPanel extends StatelessWidget {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.sensors_rounded),
-                label: Text(
-                  AppConfig.useMockIot ? 'SIMULER LA CARTE' : 'LIRE LA CARTE',
-                ),
+                label: Text(useMockIot ? 'SIMULER LA CARTE' : 'LIRE LA CARTE'),
               ),
             ],
           ],
@@ -204,7 +243,9 @@ class _PhotoResult extends StatelessWidget {
                 const SizedBox(width: 16),
                 Expanded(
                   child: Text(
-                    client.photoCount == 0
+                    client.messages.isNotEmpty
+                        ? '${client.messages.length} captures simulées enregistrées.'
+                        : client.photoCount == 0
                         ? 'Aucune photo synchronisée pour cette session.'
                         : '${client.photoCount} photos prêtes à sélectionner.',
                   ),
@@ -213,6 +254,11 @@ class _PhotoResult extends StatelessWidget {
             ),
           ),
         ),
+        for (final message in client.messages)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Text(message),
+          ),
       ],
     );
   }

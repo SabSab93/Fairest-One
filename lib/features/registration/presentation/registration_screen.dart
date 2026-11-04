@@ -4,42 +4,48 @@ import 'package:go_router/go_router.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../data/client_store.dart';
+import '../../mirror/data/nfc_flow_controller.dart';
 
 class RegistrationScreen extends StatefulWidget {
   const RegistrationScreen({
     super.key,
     this.clientStore = const ConfiguredClientStore(),
+    this.useMockIot = AppConfig.useMockIot,
+    this.nfcController,
   });
 
   static const String routeName = 'registration';
 
   final ClientStore clientStore;
+  final bool useMockIot;
+  final NfcFlowController? nfcController;
 
   @override
   State<RegistrationScreen> createState() => _RegistrationScreenState();
 }
 
 class _RegistrationScreenState extends State<RegistrationScreen> {
+  NfcFlowController get _nfc =>
+      widget.nfcController ?? NfcFlowController.instance;
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _cardController = TextEditingController();
 
   bool _isSaving = false;
+  bool _associated = false;
 
   @override
   void dispose() {
+    if (!widget.useMockIot) _nfc.stop();
     _emailController.dispose();
     _cardController.dispose();
     super.dispose();
   }
 
   void _readCard() {
-    if (!AppConfig.useMockIot) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('En attente du lecteur RFID de la Raspberry Pi.'),
-        ),
-      );
+    if (_isSaving) return;
+    if (!widget.useMockIot) {
+      _submit();
       return;
     }
 
@@ -55,12 +61,41 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
     setState(() => _isSaving = true);
 
+    if (!widget.useMockIot) {
+      try {
+        if (!_associated) {
+          final result = await _nfc.read(
+            'registration',
+            email: _emailController.text,
+          );
+          if (!mounted) return;
+          if (result['state'] == 'associated') {
+            setState(() {
+              _cardController.text = result['uid'] as String;
+              _associated = true;
+            });
+          }
+        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(_nfc.status.value)));
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(_nfc.status.value)));
+        }
+      } finally {
+        if (mounted) setState(() => _isSaving = false);
+      }
+      return;
+    }
+
     try {
       final result = await widget.clientStore.createClient(
         email: _emailController.text,
         cardUid: _cardController.text,
       );
-      if (result == ClientSaveResult.created && AppConfig.useMockIot) {
+      if (result == ClientSaveResult.created && widget.useMockIot) {
         try {
           await const DemoCardStore().save(_cardController.text);
         } catch (_) {
@@ -131,6 +166,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         TextFormField(
                           key: const Key('client-email-field'),
                           controller: _emailController,
+                          readOnly: _isSaving,
+                          onChanged: (_) {
+                            if (_associated) {
+                              setState(() {
+                                _associated = false;
+                                _cardController.clear();
+                              });
+                            }
+                          },
                           keyboardType: TextInputType.emailAddress,
                           textInputAction: TextInputAction.next,
                           autofillHints: const [AutofillHints.email],
@@ -166,12 +210,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                             prefixIcon: const Icon(Icons.contactless_outlined),
                             suffixIcon: IconButton(
                               tooltip: 'Lire la carte NFC',
-                              onPressed: _readCard,
+                              onPressed: _isSaving ? null : _readCard,
                               icon: const Icon(Icons.sensors_rounded),
                             ),
                           ),
                           validator: (value) {
-                            if (value == null || value.isEmpty) {
+                            if (widget.useMockIot &&
+                                (value == null || value.isEmpty)) {
                               return 'Présentez une carte NFC';
                             }
                             return null;
@@ -181,10 +226,19 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  _CardStatus(isAssociated: _cardController.text.isNotEmpty),
+                  _CardStatus(
+                    isAssociated: _cardController.text.isNotEmpty,
+                    useMockIot: widget.useMockIot,
+                  ),
+                  if (!widget.useMockIot && _isSaving)
+                    ValueListenableBuilder<String>(
+                      valueListenable: _nfc.status,
+                      builder: (context, value, _) =>
+                          Semantics(liveRegion: true, child: Text(value)),
+                    ),
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
-                    onPressed: _isSaving ? null : _submit,
+                    onPressed: _isSaving || _associated ? null : _submit,
                     icon: _isSaving
                         ? const SizedBox.square(
                             dimension: 18,
@@ -195,7 +249,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                           )
                         : const Icon(Icons.arrow_forward_rounded),
                     label: Text(
-                      _isSaving ? 'ENREGISTREMENT...' : 'CRÉER LA SESSION',
+                      _isSaving
+                          ? 'ENREGISTREMENT...'
+                          : _associated
+                          ? 'SESSION CRÉÉE'
+                          : 'CRÉER LA SESSION',
                     ),
                   ),
                 ],
@@ -209,9 +267,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 }
 
 class _CardStatus extends StatelessWidget {
-  const _CardStatus({required this.isAssociated});
+  const _CardStatus({required this.isAssociated, required this.useMockIot});
 
   final bool isAssociated;
+  final bool useMockIot;
 
   @override
   Widget build(BuildContext context) {
@@ -229,7 +288,7 @@ class _CardStatus extends StatelessWidget {
           child: Text(
             isAssociated
                 ? 'Carte prête pour l’essayage au miroir.'
-                : AppConfig.useMockIot
+                : useMockIot
                 ? 'Touchez l’icône pour simuler une carte.'
                 : 'Présentez la carte au lecteur de la borne.',
             style: Theme.of(context).textTheme.bodySmall,

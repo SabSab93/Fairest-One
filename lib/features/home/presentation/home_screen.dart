@@ -3,83 +3,128 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../admin/presentation/admin_screen.dart';
+import '../../../core/config/app_config.dart';
+import '../../mirror/data/nfc_flow_controller.dart';
 import '../../mirror/data/mock_mirror_status_service.dart';
 import '../../mirror/domain/mirror_status.dart';
 import '../../photo_recovery/presentation/photo_recovery_screen.dart';
 import '../../registration/presentation/registration_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   static const String routeName = 'home';
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void dispose() {
+    if (!AppConfig.useMockIot) NfcFlowController.instance.stop();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final status = const MockMirrorStatusService().currentStatus();
-
-    return Scaffold(
-      body: SafeArea(
-        child: Stack(
-          children: [
-            const Positioned.fill(
-              child: IgnorePointer(
-                child: CustomPaint(painter: _DoodlePainter()),
-              ),
-            ),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final isCompact = constraints.maxWidth < 640;
-
-                return SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(
-                    isCompact ? 20 : 40,
-                    isCompact ? 20 : 28,
-                    isCompact ? 20 : 40,
-                    28,
+    return ValueListenableBuilder<MirrorStatus>(
+      valueListenable: NfcFlowController.instance.state,
+      builder: (context, bleStatus, _) {
+        final status = AppConfig.useMockIot
+            ? const MockMirrorStatusService().currentStatus()
+            : bleStatus;
+        return Scaffold(
+          body: SafeArea(
+            child: Stack(
+              children: [
+                const Positioned.fill(
+                  child: IgnorePointer(
+                    child: CustomPaint(painter: _DoodlePainter()),
                   ),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 980),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _Header(status: status, isCompact: isCompact),
-                          SizedBox(height: isCompact ? 42 : 62),
-                          Text(
-                            'Tableau de bord',
-                            style: Theme.of(context).textTheme.displaySmall
-                                ?.copyWith(
-                                  fontFamily: 'Cormorant Garamond',
-                                  fontSize: 48,
-                                  fontWeight: FontWeight.w400,
-                                ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Choisissez le parcours à démarrer.',
-                            style: Theme.of(context).textTheme.bodyLarge
-                                ?.copyWith(
-                                  color: MinimalPalette.ink.withValues(
-                                    alpha: 0.64,
+                ),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isCompact = constraints.maxWidth < 640;
+
+                    return SingleChildScrollView(
+                      padding: EdgeInsets.fromLTRB(
+                        isCompact ? 20 : 40,
+                        isCompact ? 20 : 28,
+                        isCompact ? 20 : 40,
+                        28,
+                      ),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 980),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _Header(status: status, isCompact: isCompact),
+                              SizedBox(height: isCompact ? 42 : 62),
+                              Text(
+                                'Tableau de bord',
+                                style: Theme.of(context).textTheme.displaySmall
+                                    ?.copyWith(
+                                      fontFamily: 'Cormorant Garamond',
+                                      fontSize: 48,
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Choisissez le parcours à démarrer.',
+                                style: Theme.of(context).textTheme.bodyLarge
+                                    ?.copyWith(
+                                      color: MinimalPalette.ink.withValues(
+                                        alpha: 0.64,
+                                      ),
+                                    ),
+                              ),
+                              SizedBox(height: isCompact ? 26 : 34),
+                              const _PrimaryActions(),
+                              const SizedBox(height: 22),
+                              if (AppConfig.useMockIot)
+                                _MirrorStatusPanel(status: status)
+                              else
+                                ValueListenableBuilder<String>(
+                                  valueListenable:
+                                      NfcFlowController.instance.status,
+                                  builder: (context, value, _) => Column(
+                                    children: [
+                                      Semantics(
+                                        liveRegion: true,
+                                        child: Text(value),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      OutlinedButton.icon(
+                                        onPressed: () => NfcFlowController
+                                            .instance
+                                            .startTryOn(),
+                                        icon: const Icon(
+                                          Icons.bluetooth_connected,
+                                        ),
+                                        label: const Text(
+                                          'CONNECTER LE MIROIR · ESSAYAGE',
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
+                              const SizedBox(height: 12),
+                              const _AdminEntry(),
+                            ],
                           ),
-                          SizedBox(height: isCompact ? 26 : 34),
-                          const _PrimaryActions(),
-                          const SizedBox(height: 22),
-                          _MirrorStatusPanel(status: status),
-                          const SizedBox(height: 12),
-                          const _AdminEntry(),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
-                );
-              },
+                    );
+                  },
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -250,7 +295,7 @@ class _MirrorStatusPanel extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
         child: Row(
           children: [
-            const _StatusDot(),
+            _StatusDot(status: status),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -323,11 +368,11 @@ class _ConnectionBadge extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const _StatusDot(),
+            _StatusDot(status: status),
             if (showLabel) ...[
               const SizedBox(width: 9),
               Text(
-                'MIROIR PRÊT',
+                _statusLabel(status).toUpperCase(),
                 style: Theme.of(context).textTheme.labelSmall
                     ?.copyWith(fontWeight: FontWeight.w700, letterSpacing: 1.2),
               ),
@@ -340,15 +385,20 @@ class _ConnectionBadge extends StatelessWidget {
 }
 
 class _StatusDot extends StatelessWidget {
-  const _StatusDot();
+  const _StatusDot({required this.status});
+  final MirrorStatus status;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: 10,
       height: 10,
-      decoration: const BoxDecoration(
-        color: MinimalPalette.sage,
+      decoration: BoxDecoration(
+        color: status == MirrorStatus.offline
+            ? Colors.grey
+            : status == MirrorStatus.error
+            ? Colors.red
+            : MinimalPalette.sage,
         shape: BoxShape.circle,
       ),
     );

@@ -393,8 +393,8 @@ class _LogView extends StatelessWidget {
       (
         AppConfig.useMockIot ? 'Mode simulation' : 'Mode matériel',
         AppConfig.useMockIot
-            ? 'La Raspberry Pi n’est pas encore connectée'
-            : 'Connexion à ${AppConfig.mirrorApiBaseUrl}',
+            ? 'Lecteur NFC simulé'
+            : 'Connexion BLE depuis le tableau de bord',
       ),
     ];
 
