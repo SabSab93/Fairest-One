@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:nfc_manager/nfc_manager.dart';
+import 'package:nfc_manager/nfc_manager_android.dart';
 import 'package:nfc_manager/nfc_manager_ios.dart';
 
 abstract interface class PhoneNfcReader {
@@ -22,6 +23,11 @@ String nfcUidToHex(List<int> bytes) {
       .toUpperCase();
 }
 
+/// The NFC antenna position varies between Android models.
+String get phoneNfcInstruction => defaultTargetPlatform == TargetPlatform.iOS
+    ? 'Approchez la carte du haut de l’iPhone.'
+    : 'Approchez la carte du dos du téléphone, près de son antenne NFC.';
+
 class NativePhoneNfcReader implements PhoneNfcReader {
   NativePhoneNfcReader({
     NfcManager? manager,
@@ -37,12 +43,13 @@ class NativePhoneNfcReader implements PhoneNfcReader {
   Future<String> readUid() async {
     if (kIsWeb) {
       throw StateError(
-        'La lecture NFC nécessite l’application iPhone installée. Elle n’est pas disponible dans Safari.',
+        'La lecture NFC nécessite l’application Android ou iOS installée. Le site ne propose pas cette lecture.',
       );
     }
-    if (defaultTargetPlatform != TargetPlatform.iOS) {
+    if (defaultTargetPlatform != TargetPlatform.iOS &&
+        defaultTargetPlatform != TargetPlatform.android) {
       throw StateError(
-        'Cette lecture NFC est prévue pour l’application iPhone.',
+        'Utilisez l’application installée sur un téléphone Android ou iOS compatible NFC.',
       );
     }
     if (_pending != null) {
@@ -57,25 +64,34 @@ class NativePhoneNfcReader implements PhoneNfcReader {
         const Duration(seconds: 8),
       );
       if (pending.isCompleted) return await pending.future;
+      if (availability == NfcAvailability.disabled) {
+        throw StateError(
+          'Activez le NFC dans les paramètres du téléphone, puis relancez la lecture.',
+        );
+      }
       if (availability != NfcAvailability.enabled) {
-        throw StateError('La lecture NFC n’est pas disponible sur cet iPhone.');
+        throw StateError(
+          'Ce téléphone ne dispose pas d’un lecteur NFC compatible.',
+        );
       }
       _started = true;
       await _manager
           .startSession(
             pollingOptions: {NfcPollingOption.iso14443},
-            alertMessageIos: 'Approchez votre carte du haut de l’iPhone.',
+            alertMessageIos: phoneNfcInstruction,
             invalidateAfterFirstReadIos: false,
             onDiscovered: (tag) {
               if (pending.isCompleted) return;
               try {
-                final mifare = MiFareIos.from(tag);
-                if (mifare == null) {
+                final bytes = defaultTargetPlatform == TargetPlatform.iOS
+                    ? MiFareIos.from(tag)?.identifier
+                    : NfcAAndroid.from(tag)?.tag.id;
+                if (bytes == null) {
                   throw StateError(
                     'Utilisez une carte compatible, par exemple NTAG215.',
                   );
                 }
-                pending.complete(nfcUidToHex(mifare.identifier));
+                pending.complete(nfcUidToHex(bytes));
               } catch (error, stack) {
                 pending.completeError(error, stack);
               }
@@ -94,10 +110,17 @@ class NativePhoneNfcReader implements PhoneNfcReader {
       // A cancel may have invalidated while native startup was still pending.
       // Ensure the finally block also closes a session that finished starting later.
       _started = true;
-      return await pending.future.timeout(readTimeout);
+      return await pending.future.timeout(
+        readTimeout,
+        onTimeout: () => throw StateError(
+          'Aucune carte détectée. Relancez la lecture et approchez la carte de l’antenne NFC.',
+        ),
+      );
     } on PlatformException {
       throw StateError(
-        'Impossible de démarrer le NFC. Vérifiez la configuration NFC et la signature iOS dans Xcode.',
+        defaultTargetPlatform == TargetPlatform.iOS
+            ? 'Impossible de démarrer le NFC. Vérifiez la configuration NFC et la signature iOS dans Xcode.'
+            : 'Impossible de démarrer le NFC. Activez-le dans les paramètres du téléphone, puis réessayez.',
       );
     } finally {
       await _stopSession();

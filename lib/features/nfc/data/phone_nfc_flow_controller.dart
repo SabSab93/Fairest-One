@@ -15,13 +15,13 @@ class PhoneNfcFlowController with WidgetsBindingObserver {
   });
   static final instance = PhoneNfcFlowController(
     reader: NativePhoneNfcReader(),
-    accessStore: const KeychainPhoneAccessStore(),
+    accessStore: const SecurePhoneAccessStore(),
     api: ApiClient(),
   );
   final PhoneNfcReader reader;
   final PhoneAccessStore accessStore;
   final ApiClient api;
-  final status = ValueNotifier<String>('Lecteur NFC de l’iPhone prêt');
+  final status = ValueNotifier<String>('Lecteur NFC du téléphone prêt');
   bool _busy = false;
   bool _stopping = false;
   int _generation = 0;
@@ -60,10 +60,10 @@ class PhoneNfcFlowController with WidgetsBindingObserver {
     try {
       if (!api.usesHttps) {
         throw StateError(
-          'Configurez l’adresse HTTPS de l’API pour utiliser le NFC sur iPhone.',
+          'Configurez l’adresse HTTPS de l’API pour utiliser le NFC sur le téléphone.',
         );
       }
-      status.value = 'Approchez la carte du haut de l’iPhone';
+      status.value = phoneNfcInstruction;
       final uid = await reader.readUid();
       checkActive();
       access = await accessStore.read();
@@ -71,7 +71,7 @@ class PhoneNfcFlowController with WidgetsBindingObserver {
       if (access == null) {
         if (purpose == 'recovery') {
           throw StateError(
-            'Cette carte doit avoir été inscrite depuis cet iPhone pour y récupérer ses photos.',
+            'Cette carte doit avoir été inscrite depuis ce téléphone pour y récupérer ses photos.',
           );
         }
         access = newPhoneAccessToken();
@@ -79,7 +79,7 @@ class PhoneNfcFlowController with WidgetsBindingObserver {
         await accessStore.save(access);
         if (await accessStore.read() != access) {
           throw StateError(
-            'Impossible de conserver l’accès dans le trousseau sécurisé. Aucune inscription envoyée.',
+            'Impossible de conserver l’accès dans le stockage sécurisé. Aucune inscription envoyée.',
           );
         }
         checkActive();

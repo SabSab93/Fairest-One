@@ -14,6 +14,12 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:nfc_manager/nfc_manager.dart';
 import 'package:nfc_manager/nfc_manager_ios.dart';
+// The pinned plugin's native payload types back its public NfcTag test constructor.
+// ignore: implementation_imports
+import 'package:nfc_manager/src/nfc_manager_android/pigeon.g.dart'
+    as android_codec;
+// ignore: implementation_imports
+import 'package:nfc_manager/src/nfc_manager_ios/pigeon.g.dart' as ios_codec;
 
 class FakePhoneReader implements PhoneNfcReader {
   int reads = 0;
@@ -48,6 +54,7 @@ class MemoryPhoneAccess implements PhoneAccessStore {
 class FakeNfcManager implements NfcManager {
   NfcAvailability availability = NfcAvailability.enabled;
   void Function()? afterStart;
+  void Function(NfcTag)? discovered;
   void Function(NfcReaderSessionErrorIos)? onError;
   Completer<void>? startup;
   int starts = 0;
@@ -69,6 +76,7 @@ class FakeNfcManager implements NfcManager {
     expect(invalidateAfterFirstReadIos, isFalse);
     starts++;
     onError = onSessionErrorIos;
+    discovered = onDiscovered;
     afterStart?.call();
     await startup?.future;
   }
@@ -110,78 +118,142 @@ void main() {
     expect(() => nfcUidToHex([256, 0, 0, 0]), throwsStateError);
     expect(newPhoneAccessToken(), matches(RegExp(r'^[a-f0-9]{64}$')));
   });
-  for (final purpose in ['registration', 'recovery']) {
-    testWidgets('existing $purpose screen uses phone NFC without BLE', (
-      tester,
-    ) async {
-      final reader = FakePhoneReader();
-      final access = MemoryPhoneAccess()..token = 'b' * 64;
-      final actions = <String>[];
-      final api = ApiClient(
-        baseUrl: 'https://example.test/api/',
-        client: MockClient((request) async {
-          final body = jsonDecode(request.body) as Map<String, dynamic>;
-          actions.add(body['action'] as String);
-          expect(body['mobile_token'], access.token);
-          expect(body.containsKey('proof'), isFalse);
-          if ((body['action'] as String).startsWith('begin_')) {
-            return jsonResponse({'token': 'a' * 64}, 200);
-          }
-          expect(body['card_uid'], '04010203040506');
-          return jsonResponse(
-            purpose == 'registration' ? {'state': 'associated'} : recovered(),
-            200,
-          );
-        }),
-      );
-      final flow = PhoneNfcFlowController(
-        reader: reader,
-        accessStore: access,
-        api: api,
-      );
-      await tester.binding.setSurfaceSize(const Size(390, 844));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.pumpWidget(
-        MaterialApp(
-          home: purpose == 'registration'
-              ? RegistrationScreen(useMockIot: false, phoneNfcController: flow)
-              : PhotoRecoveryScreen(
-                  useMockIot: false,
-                  phoneNfcController: flow,
+  for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
+    test(
+      '${platform.name} decodes a native NTAG payload once in RC522 byte order',
+      () async {
+        debugDefaultTargetPlatformOverride = platform;
+        addTearDown(() => debugDefaultTargetPlatformOverride = null);
+        final bytes = Uint8List.fromList([4, 1, 2, 3, 4, 5, 6]);
+        final payload = platform == TargetPlatform.android
+            ? android_codec.TagPigeon(
+                handle: 'test-tag',
+                id: bytes,
+                techList: ['android.nfc.tech.NfcA'],
+                nfcA: android_codec.NfcAPigeon(
+                  atqa: Uint8List.fromList([0x44, 0]),
+                  sak: 0,
                 ),
+              )
+            : ios_codec.TagPigeon(
+                handle: 'test-tag',
+                miFare: ios_codec.MiFarePigeon(
+                  mifareFamily: ios_codec.MiFareFamilyPigeon.ultralight,
+                  identifier: bytes,
+                ),
+              );
+        final manager = FakeNfcManager();
+        manager.afterStart = () {
+          manager.discovered!(NfcTag(data: payload));
+          manager.discovered!(NfcTag(data: payload));
+        };
+        final reader = NativePhoneNfcReader(manager: manager);
+        expect(await reader.readUid(), '04010203040506');
+        expect(manager.stops, 1);
+      },
+    );
+  }
+  test('Android rejects a tag that the RC522 cannot read as NFC-A', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final manager = FakeNfcManager();
+    manager.afterStart = () => manager.discovered!(
+      NfcTag(
+        data: android_codec.TagPigeon(
+          handle: 'wrong-tech',
+          id: Uint8List.fromList([1, 2, 3, 4]),
+          techList: ['android.nfc.tech.NfcV'],
         ),
+      ),
+    );
+    await expectLater(
+      NativePhoneNfcReader(manager: manager).readUid(),
+      throwsStateError,
+    );
+    expect(manager.stops, 1);
+  });
+  for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
+    for (final purpose in ['registration', 'recovery']) {
+      testWidgets(
+        '${platform.name} $purpose screen uses phone NFC without BLE',
+        (tester) async {
+          final reader = FakePhoneReader();
+          final access = MemoryPhoneAccess()..token = 'b' * 64;
+          final actions = <String>[];
+          final api = ApiClient(
+            baseUrl: 'https://example.test/api/',
+            client: MockClient((request) async {
+              final body = jsonDecode(request.body) as Map<String, dynamic>;
+              actions.add(body['action'] as String);
+              expect(body['mobile_token'], access.token);
+              expect(body.containsKey('proof'), isFalse);
+              if ((body['action'] as String).startsWith('begin_')) {
+                return jsonResponse({'token': 'a' * 64}, 200);
+              }
+              expect(body['card_uid'], '04010203040506');
+              return jsonResponse(
+                purpose == 'registration'
+                    ? {'state': 'associated'}
+                    : recovered(),
+                200,
+              );
+            }),
+          );
+          final flow = PhoneNfcFlowController(
+            reader: reader,
+            accessStore: access,
+            api: api,
+          );
+          await tester.binding.setSurfaceSize(const Size(390, 844));
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          await tester.pumpWidget(
+            MaterialApp(
+              home: purpose == 'registration'
+                  ? RegistrationScreen(
+                      useMockIot: false,
+                      phoneNfcController: flow,
+                    )
+                  : PhotoRecoveryScreen(
+                      useMockIot: false,
+                      phoneNfcController: flow,
+                    ),
+            ),
+          );
+          if (purpose == 'registration') {
+            await tester.enterText(
+              find.byKey(const Key('client-email-field')),
+              'phone@example.test',
+            );
+            await tester.ensureVisible(find.text('CRÉER LA SESSION'));
+          }
+          await tester.runAsync(() async {
+            await tester.tap(
+              find.text(
+                purpose == 'registration'
+                    ? 'CRÉER LA SESSION'
+                    : 'LIRE LA CARTE',
+              ),
+            );
+            await flow.whenIdle;
+          });
+          await tester.pumpAndSettle();
+          expect(reader.reads, 1);
+          expect(actions, ['begin_phone_$purpose', 'phone_scan']);
+          if (purpose == 'registration') {
+            expect(find.text('SESSION CRÉÉE'), findsOneWidget);
+          } else {
+            expect(
+              find.text('Photo simulée n°3 — Essayage effectué.'),
+              findsOneWidget,
+            );
+            expect(find.text('phone@example.test'), findsOneWidget);
+          }
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox());
+          api.close();
+        },
       );
-      if (purpose == 'registration') {
-        await tester.enterText(
-          find.byKey(const Key('client-email-field')),
-          'phone@example.test',
-        );
-        await tester.ensureVisible(find.text('CRÉER LA SESSION'));
-      }
-      await tester.runAsync(() async {
-        await tester.tap(
-          find.text(
-            purpose == 'registration' ? 'CRÉER LA SESSION' : 'LIRE LA CARTE',
-          ),
-        );
-        await flow.whenIdle;
-      });
-      await tester.pumpAndSettle();
-      expect(reader.reads, 1);
-      expect(actions, ['begin_phone_$purpose', 'phone_scan']);
-      if (purpose == 'registration') {
-        expect(find.text('SESSION CRÉÉE'), findsOneWidget);
-      } else {
-        expect(
-          find.text('Photo simulée n°3 — Essayage effectué.'),
-          findsOneWidget,
-        );
-        expect(find.text('phone@example.test'), findsOneWidget);
-      }
-      expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox());
-      api.close();
-    });
+    }
   }
   test(
     'personal credential is saved before registration and reused on retry',
@@ -319,27 +391,56 @@ void main() {
       expect(manager.stops, 2);
     },
   );
-  for (final scenario in ['unavailable', 'timeout', 'cancel']) {
-    test('native session handles $scenario and releases the reader', () async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-      addTearDown(() => debugDefaultTargetPlatformOverride = null);
-      final manager = FakeNfcManager();
-      if (scenario == 'unavailable') {
-        manager.availability = NfcAvailability.unsupported;
-      }
-      final reader = NativePhoneNfcReader(
-        manager: manager,
-        readTimeout: const Duration(milliseconds: 10),
+  for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
+    for (final scenario in ['unavailable', 'disabled', 'timeout', 'cancel']) {
+      test(
+        '${platform.name} session handles $scenario and releases the reader',
+        () async {
+          debugDefaultTargetPlatformOverride = platform;
+          addTearDown(() => debugDefaultTargetPlatformOverride = null);
+          final manager = FakeNfcManager();
+          if (scenario == 'disabled') {
+            manager.availability = NfcAvailability.disabled;
+          }
+          if (scenario == 'unavailable') {
+            manager.availability = NfcAvailability.unsupported;
+          }
+          final reader = NativePhoneNfcReader(
+            manager: manager,
+            readTimeout: const Duration(milliseconds: 10),
+          );
+          final operation = reader.readUid();
+          final expectedMessage = switch (scenario) {
+            'unavailable' => 'ne dispose pas',
+            'disabled' => 'Activez le NFC',
+            'timeout' => 'Aucune carte détectée',
+            _ => 'Lecture NFC annulée',
+          };
+          final expectation = expectLater(
+            operation,
+            throwsA(
+              isA<StateError>().having(
+                (error) => error.message,
+                'message',
+                contains(expectedMessage),
+              ),
+            ),
+          );
+          if (scenario == 'cancel') {
+            await Future<void>.delayed(const Duration(milliseconds: 1));
+            await reader.cancel();
+          }
+          await expectation;
+          expect(
+            manager.starts,
+            ['unavailable', 'disabled'].contains(scenario) ? 0 : 1,
+          );
+          expect(
+            manager.stops,
+            ['unavailable', 'disabled'].contains(scenario) ? 0 : 1,
+          );
+        },
       );
-      final operation = reader.readUid();
-      final expectation = expectLater(operation, throwsA(anything));
-      if (scenario == 'cancel') {
-        await Future<void>.delayed(const Duration(milliseconds: 1));
-        await reader.cancel();
-      }
-      await expectation;
-      expect(manager.starts, scenario == 'unavailable' ? 0 : 1);
-      expect(manager.stops, scenario == 'unavailable' ? 0 : 1);
-    });
+    }
   }
 }

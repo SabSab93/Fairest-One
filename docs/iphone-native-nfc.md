@@ -1,5 +1,7 @@
 # Lecture NFC native sur iPhone — inscription et récupération
 
+**Support Android ajouté :** le même service lit aussi les NTAG215 sur Android. Le [guide Android](android-native-nfc.md) décrit l’installation et les tests gratuits sur téléphone. Les explications ci-dessous restent spécifiques à iOS.
+
 Cette évolution réutilise les écrans, la navigation, `ClientRecord`, `ApiClient`, l'endpoint Vercel `/api/clients` et les tables Supabase. Branche : `feat/iphone-native-nfc`.
 
 ## Parcours actuel
@@ -124,14 +126,14 @@ Le `/api/` final est nécessaire. Ne pas ajouter de secret dans cette commande. 
 
 ## Vérifications
 
-- 35 tests Flutter : parcours natifs et BLE simulés, écrans existants, format UID, persistance avant inscription, relance d'enregistrement, refus d'accès, annulation, timeout, arrière-plan et exigence HTTPS.
+- 45 tests Flutter : parcours natifs et BLE simulés, écrans existants, format UID, persistance avant inscription, relance d'enregistrement, refus d'accès, annulation, timeout, arrière-plan et exigence HTTPS.
 - 6 tests API Node : validation, séparation téléphone/miroir et absence d'exposition des secrets.
 - Scénarios PostgreSQL sur une base **locale jetable** : inscription native → trois captures avec le parcours miroir existant → récupération native, usage unique, expiration, refus d'un autre jeton et conservation du propriétaire.
 - Fichiers plist, entitlements et projet Xcode vérifiés avec `plutil`.
 - Compilation iOS Debug réussie avec Xcode 27.2 **sans signature**, avec une URL API fictive de compilation. Ce binaire ne doit pas être utilisé tel quel pour le test : relancer avec la vraie URL de test et la signature autorisée. Aucun téléversement sur iPhone.
 - Le build web reste vérifié ; il n'offre pas de lecture NFC dans Safari.
 
-Les tests automatisés simulent le lecteur iOS. Ils ne remplacent pas un essai réel des cartes, de la signature et de la lecture sur l'iPhone.
+Les tests automatisés simulent les lecteurs Android et iOS. Ils ne remplacent pas un essai réel des cartes, de la signature et de la lecture sur l'iPhone.
 
 ```sh
 flutter analyze

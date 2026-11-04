@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../nfc/data/phone_nfc_flow_controller.dart';
+import '../../nfc/data/phone_nfc_reader.dart';
 import '../../registration/data/client_store.dart';
 import '../../mirror/data/nfc_flow_controller.dart';
 import '../../registration/domain/client_record.dart';
@@ -214,7 +215,7 @@ class _ReaderPanel extends StatelessWidget {
                   : useMockIot
                   ? 'Touchez le bouton pour simuler une carte.'
                   : usePhoneNfc
-                  ? 'Touchez « LIRE LA CARTE », puis approchez la carte du haut de l’iPhone.'
+                  ? 'Touchez « LIRE LA CARTE ». $phoneNfcInstruction'
                   : 'Approchez la carte du lecteur de la borne.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium,
