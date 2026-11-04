@@ -1,13 +1,16 @@
 export class Cancelled extends Error {
-  constructor() { super('Lecture annulée.'); this.name = 'Cancelled'; }
+  constructor(message = 'Lecture annulée.') { super(message); this.name = 'Cancelled'; }
+}
+export function cancellation(signal: AbortSignal): Cancelled {
+  return signal.reason instanceof Cancelled ? signal.reason : new Cancelled();
 }
 export function checkActive(signal: AbortSignal) {
-  if (signal.aborted) throw new Cancelled();
+  if (signal.aborted) throw cancellation(signal);
 }
 export function wait<T>(task: Promise<T>, signal: AbortSignal, ms: number, message: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     let timer: ReturnType<typeof setTimeout>;
-    const abort = () => finish(() => reject(new Cancelled()));
+    const abort = () => finish(() => reject(cancellation(signal)));
     const finish = (callback: () => void) => {
       clearTimeout(timer);
       signal.removeEventListener('abort', abort);
@@ -21,7 +24,7 @@ export function wait<T>(task: Promise<T>, signal: AbortSignal, ms: number, messa
 }
 export function delay(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
-    const abort = () => { clearTimeout(timer); reject(new Cancelled()); };
+    const abort = () => { clearTimeout(timer); reject(cancellation(signal)); };
     const timer = setTimeout(() => { signal.removeEventListener('abort', abort); resolve(); }, ms);
     signal.addEventListener('abort', abort, { once: true });
     if (signal.aborted) abort();

@@ -19,7 +19,7 @@ export const accessStore: AccessStore = {
 export const phoneReader: PhoneReader = {
   async readUid(signal) {
     nativeBuild(); checkActive(signal);
-    const { default: nfc, NfcTech } = await import('react-native-nfc-manager');
+    const { default: nfc, NfcTech, NfcAdapter } = await import('react-native-nfc-manager');
     if (!await nfc.isSupported()) throw new Error('Ce téléphone ne possède pas de lecteur NFC compatible.');
     await nfc.start(); checkActive(signal);
     if (Platform.OS === 'android' && !await nfc.isEnabled()) throw new Error('Activez le NFC dans les réglages du téléphone.');
@@ -27,7 +27,12 @@ export const phoneReader: PhoneReader = {
     signal.addEventListener('abort', cancel, { once: true });
     try {
       checkActive(signal);
-      await wait(nfc.requestTechnology(Platform.OS === 'ios' ? NfcTech.MifareIOS : NfcTech.NfcA, { alertMessage: 'Approchez votre carte Fairest One.' }), signal, 45000, 'Aucune carte détectée. Réessayez en la déplaçant au dos du téléphone.');
+      // Android reader mode delivers the tag inside this Activity rather than
+      // launching an NFC intent (which can change screen or background the app).
+      const options = Platform.OS === 'android'
+        ? { isReaderModeEnabled: true, readerModeFlags: NfcAdapter.FLAG_READER_NFC_A | NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK }
+        : { alertMessage: 'Approchez votre carte Fairest One.' };
+      await wait(nfc.requestTechnology(Platform.OS === 'ios' ? NfcTech.MifareIOS : NfcTech.NfcA, options), signal, 45000, 'Aucune carte détectée. Réessayez en la déplaçant au dos du téléphone.');
       const tag = await nfc.getTag({ readNdef: false });
       checkActive(signal);
       if (!tag?.id) throw new Error('Identifiant de carte indisponible.');

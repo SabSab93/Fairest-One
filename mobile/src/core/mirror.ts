@@ -1,7 +1,7 @@
 import { Flow } from './state';
 import { ApiError } from './api';
-import { Cancelled, checkActive, delay, normalizeUid } from './async';
-import type { Api, BleEvent, MirrorTransport } from './types';
+import { cancellation, checkActive, delay, normalizeUid } from './async';
+import type { Api, BleEvent, MirrorTransport, Purpose } from './types';
 
 export class MirrorFlow extends Flow {
   constructor(private readonly api: Api, private readonly ble: MirrorTransport, private readonly eventTimeout = 35000) { super(); }
@@ -14,7 +14,7 @@ export class MirrorFlow extends Flow {
         settled = true; clearTimeout(timer); unsubscribe(); signal.removeEventListener('abort', abort);
         if (error) reject(error); else resolve(event!);
       };
-      const abort = () => finish(undefined, new Cancelled());
+      const abort = () => finish(undefined, cancellation(signal));
       const timer = setTimeout(() => finish(undefined, new Error('Le miroir ne répond pas. Relancez la connexion.')), this.eventTimeout);
       unsubscribe = this.ble.subscribe(event => {
         if (event instanceof Error) return finish(undefined, event);
@@ -25,6 +25,56 @@ export class MirrorFlow extends Flow {
       signal.addEventListener('abort', abort, { once: true });
       if (signal.aborted) abort();
       else void this.ble.send(command, signal).catch(error => finish(undefined, error));
+    });
+  }
+  read(purpose: Purpose, email?: string) {
+    return this.run(async signal => {
+      const normalizedEmail = email?.trim().toLowerCase();
+      if (purpose === 'registration' && (!normalizedEmail || normalizedEmail.length > 254 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalizedEmail))) {
+        throw new Error('Saisissez une adresse e-mail valide.');
+      }
+      let token: string | undefined;
+      let completed = false;
+      this.publish('Connexion Bluetooth au lecteur du miroir…', 'checking');
+      try {
+        await this.ble.connect(signal);
+        checkActive(signal);
+        const begin = await this.api.post({ action: `begin_${purpose}`, ...(purpose === 'registration' ? { email: normalizedEmail } : {}) }, signal);
+        token = begin.token;
+        if (!token || !/^[0-9a-f]{64}$/.test(token)) throw new Error('Demande du miroir invalide.');
+        this.publish('Présentez votre carte au lecteur du miroir.', 'reading');
+        const scan = await this.event('card_scanned', token, { type: 'scan', token }, signal);
+        const uid = normalizeUid(scan.uid);
+        if (!scan.proof || !/^[0-9a-f]{64}$/.test(scan.proof)) throw new Error('Lecture du miroir non signée.');
+        this.publish(purpose === 'registration' ? 'Enregistrement de votre carte…' : 'Récupération de votre session…', 'checking');
+        const result = await this.api.post({ action: 'scan', token, card_uid: uid, proof: scan.proof }, signal);
+        checkActive(signal);
+        if (result.state === 'failed' || result.state === 'unknown') {
+          await this.ble.send({ type: 'card_result', token, recognized: false, capture: false }, signal);
+          completed = true;
+          if (result.state === 'unknown') throw new Error('Cette carte n’est pas enregistrée.');
+          throw new Error(result.code === 'email_already_exists' ? 'Cette adresse e-mail est déjà enregistrée.' : 'Cette carte est déjà associée à un client.');
+        }
+        if (result.state !== (purpose === 'registration' ? 'associated' : 'recovered')) throw new Error('Lecture non confirmée. Réessayez.');
+        if (purpose === 'recovery' && !result.client) throw new Error('La session reçue est incomplète.');
+        // The backend has committed. Losing the LED/buzzer acknowledgment must
+        // not report a failed registration or encourage creating another client.
+        completed = true;
+        try { await this.ble.send({ type: 'card_result', token, recognized: true, capture: false }, signal); }
+        catch {
+          checkActive(signal);
+          this.publish(purpose === 'registration' ? 'Carte enregistrée ; connexion au miroir interrompue.' : 'Session récupérée ; connexion au miroir interrompue.', 'saved');
+          return { ...result, uid };
+        }
+        this.publish(purpose === 'registration' ? 'Votre carte est enregistrée.' : 'Session récupérée', 'saved');
+        return { ...result, uid };
+      } finally {
+        if (!completed && token) {
+          void this.ble.send({ type: 'cancel', token }).catch(() => {});
+          void this.api.post({ action: 'cancel', token }).catch(() => {});
+        }
+        await this.ble.disconnect();
+      }
     });
   }
   private async capture(signal: AbortSignal) {

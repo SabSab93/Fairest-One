@@ -18,5 +18,5 @@ export abstract class Flow {
     catch (error) { this.publish(errorMessage(error), error instanceof Cancelled ? 'idle' : 'error'); throw error; }
     finally { this.controller = null; this.current = { ...this.current, busy: false }; this.listeners.forEach(l => l()); }
   }
-  stop() { this.controller?.abort(); }
+  stop(message?: string) { this.controller?.abort(new Cancelled(message)); }
 }

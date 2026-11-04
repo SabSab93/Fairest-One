@@ -6,7 +6,7 @@ The goal is to prepare a connected smart mirror experience: a client tries sever
 
 ## Application Expo / EAS
 
-La version mobile React Native est préparée dans [`mobile/`](mobile/README.md), avec inscription/récupération NFC native et miroir BLE pour Android et iOS. Le guide contient les étapes de création des versions EAS de test. Flutter et le backend existants restent disponibles. Aucun déploiement ni changement de base distante n’est automatique.
+La version Expo actuelle cible l’iPhone avec **toutes les lectures de cartes sur le RC522 du miroir, via BLE** : inscription, essayage et récupération. Voir [`mobile/README.md`](mobile/README.md) pour l’installation locale Xcode sans autorisation NFC native iOS. Le parcours Android natif, Flutter et le backend existants restent disponibles. Aucun déploiement ni changement de base distante n’est automatique.
 
 ## Concept
 

@@ -1,123 +1,107 @@
-# Fairest One — Expo / EAS
+# Fairest One — application Expo iPhone / lecteur BLE
 
-Application React Native distincte dans `mobile/`. Flutter, l’API Vercel, Supabase et le firmware existants sont conservés. Aucun déploiement, flashage ou changement de base distante n’est lancé par ce projet.
+Le choix actuel est une application iPhone simple, avec **le RC522 du miroir pour toutes les lectures de cartes**. L’iPhone communique exclusivement en BLE avec l’ESP32-C6, et en HTTPS avec l’API Vercel. Le Wi-Fi n’est pas utilisé sur l’ESP32. L’USB sert à la programmation et aux logs du matériel.
 
-## Parcours repris
+Les écrans, le logo, l’API Vercel, Supabase et le firmware existants sont réutilisés. Flutter et le parcours Android natif restent dans le dépôt. Aucun déploiement de backend, changement de base distante ou flashage du matériel n’est automatique.
 
-- **Nouveau client** : e-mail → lecture NFC du téléphone → association via l’API.
-- **Essayage** : accueil ouvert → connexion BLE au miroir → carte sur RC522 → validation backend → LED/bips/compte à rebours → capture simulée → enregistrement backend.
-- **Récupération** : lecture NFC du téléphone → vérification de l’accès personnel → affichage des messages de la session.
-- **Administration** : mot de passe vérifié par l’API, clients, compteurs de captures et accès aux informations de logs. Les vraies photos et l’envoi par e-mail ne sont pas encore implémentés dans le projet existant.
+## Utilisation sur iPhone
 
-Le thème, la police Cormorant Garamond et l’icône reprennent Flutter. Le navigateur permet un aperçu des écrans ; les actions NFC et BLE nécessitent une application native personnalisée, et ne fonctionnent pas dans Expo Go.
+1. **Nouveau client** : saisir l’e-mail, appuyer sur « Associer ma carte avec le miroir », autoriser Bluetooth puis présenter la carte au RC522. L’application associe l’e-mail et la carte via le backend et affiche la confirmation. Cette opération ne déclenche aucune capture.
+2. **Essayage** : depuis l’accueil, appuyer sur « Connecter le miroir » et présenter la carte au RC522. Le backend doit reconnaître la carte avant le feu vert, les deux bips et le compte à rebours. Le message de capture simulée est ensuite enregistré. Garder cet écran ouvert.
+3. **Récupération** : ouvrir « Récupérer ma session », appuyer sur « Lire ma carte sur le miroir » et présenter la carte au même RC522. Les messages de la session apparaissent sur l’iPhone. Cette opération ne déclenche aucune capture.
 
-## Préparation, quand vous serez prête
+Retirer la carte au moins 600 ms entre deux passages. Le lecteur n’est armé que pendant une demande de l’application. Une seule opération utilise le miroir à la fois. Quitter l’écran ou mettre l’app en arrière-plan annule l’opération ; une déconnexion demande une nouvelle tentative.
 
-1. Fournir et valider une **URL d’API de test**. Aucun lien de production n’est préconfiguré. L’API doit contenir les actions `begin_phone_registration`, `begin_phone_recovery`, `phone_scan`, `phone_cancel`, ainsi que les actions miroir existantes. Les migrations locales `../docs/supabase-nfc.sql` et `../docs/supabase-phone-nfc.sql` doivent avoir été vérifiées et appliquées à cette base de test par une personne autorisée. Aucune modification API supplémentaire n’est nécessaire pour Expo.
-2. Ouvrir le Terminal sur le Mac :
+Les captures sont encore **simulées** : aucune vraie photo ni envoi d’e-mail n’est implémenté. L’administration reprend la liste des clients, les compteurs et les informations de logs du projet existant.
+
+## Installer localement avec Xcode
+
+La configuration iOS ne demande plus `NFC Tag Reading` ni `NFCReaderUsageDescription`. Le NFC est lu par le RC522, jamais par Core NFC dans ce parcours. Le mode lecteur Android reste disponible, avec sa permission NFC déclarée explicitement.
+
+Un compte Apple gratuit permet de signer localement cette version BLE sur son propre iPhone. La signature gratuite expire après 7 jours : il faut alors reconstruire et réinstaller depuis le Mac. EAS/TestFlight pour un appareil iOS réel restent liés à une adhésion Apple Developer adaptée ; Expo Go ne contient pas notre bibliothèque BLE native.
+
+1. Brancher l’iPhone au Mac, le déverrouiller et accepter « Faire confiance à cet ordinateur ».
+2. Activer **Réglages → Confidentialité et sécurité → Mode développeur**, redémarrer et confirmer son activation.
+3. Sur le Mac :
 
 ```sh
 cd /Users/sabrina/dev/annee5/Fairest-One/mobile
-export PATH="/opt/homebrew/opt/node@24/bin:$PATH"
+export PATH="/opt/homebrew/opt/node@24/bin:/opt/homebrew/bin:$PATH"
 npm ci
-npx eas-cli@latest login
-npx eas-cli@latest init
-```
-
-`login` se fait avec votre compte Expo. `init` associe ce dossier à votre projet Expo et ajoute son identifiant à `app.json`. Conservez vos mots de passe pour vous. Node 24 est déjà présent sur ce Mac ; sur un autre ordinateur, installer une version compatible avec Expo SDK 57.
-
-3. Configurer la variable **publique** du build de test dans Expo :
-
-```sh
-npx eas-cli@latest env:create --environment preview --name EXPO_PUBLIC_API_URL --value https://VOTRE-PREVIEW.vercel.app/api/ --visibility plaintext
-```
-
-Remplacer l’exemple par l’URL approuvée, avec `/api/` à la fin. La variable est intégrée au JavaScript : n’y mettre aucune clé Supabase, clé miroir ou mot de passe. Le build refuse une URL absente, non HTTPS ou mal formée.
-
-4. Contrôler l’archive locale avant le premier envoi :
-
-```sh
-npx eas-cli@latest build:inspect --platform android --profile preview --stage archive --output /tmp/fairest-expo-archive
-```
-
-Le `.easignore` **à la racine du dépôt** autorise uniquement les sources/configurations/assets nécessaires de `mobile/`. Les `.env`, clés, `node_modules`, API, Flutter, base SQL et `firmware/config.h` ne doivent pas apparaître dans l’archive. Les répertoires natifs sont générés par Expo à chaque build.
-
-## Android : version simple à installer
-
-```sh
-npx eas-cli@latest build --platform android --profile preview
-```
-
-Ce profil produit un **APK autonome**, sans Metro ni ordinateur à garder allumé. À la fin, ouvrir le lien EAS sur le Xiaomi et installer l’APK. Si Android le demande, autoriser l’installation depuis la source utilisée. Aucun compte Google Play n’est nécessaire pour ce test. Les quotas/offres EAS peuvent évoluer : vérifier ce qu’Expo affiche avant de lancer un build payant.
-
-Sur Xiaomi : activer le NFC dans les réglages (chercher « NFC »), activer Bluetooth puis autoriser **Appareils à proximité** à Fairest One. Sur Android 11 ou antérieur, la recherche BLE demande l’autorisation et parfois l’activation de la localisation. Pour installer un APK EAS, le débogage USB et Android Studio ne sont pas nécessaires. Le modèle Xiaomi doit réellement disposer du NFC ; certaines variantes n’en possèdent pas.
-
-## iPhone : version personnalisée signée
-
-```sh
-npx eas-cli@latest device:create
-npx eas-cli@latest build --platform ios --profile preview
-```
-
-Ouvrir le lien d’enregistrement sur l’iPhone à tester, enregistrer cet appareil, puis sélectionner cet appareil lors de la création du profil. Utiliser une **équipe Apple Developer éligible au NFC** : la Personal Team gratuite affichée précédemment refuse `NFC Tag Reading`. Expo/EAS ne contourne pas cette restriction. Aucun achat n’est effectué automatiquement.
-
-Installer depuis le lien fourni par EAS et suivre les instructions de confiance/mode développeur si iOS les demande. Autoriser Bluetooth. Pour le NFC, appuyer sur « Lire ma carte NFC » ou « Scanner ma carte », puis tenir la carte près du haut de l’iPhone pendant la session de lecture système. Le NFC n’est pas déclenché par le lien Safari et ne se teste pas dans un simulateur.
-
-## Pendant le développement
-
-Le profil `development` inclut le client de développement Expo et demande Metro :
-
-```sh
-npx eas-cli@latest env:create --environment development --name EXPO_PUBLIC_API_URL --value https://VOTRE-PREVIEW.vercel.app/api/ --visibility plaintext
-npx eas-cli@latest build --platform android --profile development
-# ou --platform ios, après l’enregistrement de l’appareil
 cp .env.local.example .env.local
-# Renseigner la même URL de test dans .env.local
-npm start
+# Renseigner EXPO_PUBLIC_API_URL dans .env.local.
+# URL actuellement approuvée : https://fairest-one-documentation.vercel.app/api/
+npx expo prebuild --platform ios --clean
+npx expo run:ios --device --configuration Release
 ```
 
-Téléphone et Mac sur le même réseau pour Metro, ou utiliser le tunnel Expo si nécessaire. Cela concerne le développement de l’application ; **le miroir reste exclusivement en BLE**. Après ajout d’une dépendance native ou modification des autorisations, reconstruire le client.
+La version **Release** embarque le JavaScript : après installation, le Mac et Metro ne sont pas nécessaires pendant l’utilisation. Pour le développement avec rechargement rapide, utiliser `npx expo run:ios --device`, puis `npm start` avec l’iPhone sur le même réseau que le Mac.
 
-`npm run web` affiche un aperçu sans matériel. `npm run android` / `npm run ios` sont les alternatives de compilation locale avec Android Studio / Xcode. EAS cloud fournit ces outils ; CocoaPods n’est pas installé sur ce Mac et n’est pas requis pour le build iOS cloud.
+L’espace de travail est `ios/FairestOne.xcworkspace`. Dans Xcode, sélectionner l’iPhone réel et l’équipe Apple dans **Signing & Capabilities**, puis lancer la compilation. Le projet Flutter `ios/Runner.xcworkspace` est distinct : ouvrir celui de `mobile/` pour Expo.
 
-## Sécurité et protocole existant
+Les répertoires natifs sont générés et ignorés par Git : ne pas les éditer à la main pour modifier durablement une permission. Utiliser `app.json` et les plugins Expo, puis régénérer iOS.
 
-- L’UID n’est pas une authentification forte. Un accès aléatoire personnel de 256 bits est conservé dans **Expo SecureStore**, jamais dans une variable publique ou les logs. Seul son hash est lié au client côté serveur.
-- La récupération demande **la même installation de l’application sur le même téléphone**. Expo et Flutter ont des identifiants/stockages différents : les accès Flutter ne sont pas transférés automatiquement. Pour le premier test Expo, utiliser une carte et un e-mail encore libres dans la base de test, ou préparer une réassociation autorisée côté backend. Ne jamais reprendre une carte déjà affectée en contournant les contrôles.
-- Réinstallation, effacement ou perte des données peut faire perdre l’accès ; aucune récupération par UID seul n’est ajoutée.
-- Le mot de passe administrateur reste en mémoire et est effacé à la sortie de l’écran ou au passage en arrière-plan.
-- Requêtes HTTPS limitées à 10 secondes, lecture NFC à 45 secondes, attente BLE à 35 secondes. Annulation explicite, fin de lecture à la sortie de l’écran et arrêt du matériel en arrière-plan. Reconnexion BLE manuelle après erreur ; aucune capture sans validation serveur.
-- Le firmware du dépôt `../firmware/fairest_one/fairest_one.ino` reste nécessaire. Un ancien sketch de test qui envoie seulement un UID sans preuve n’est pas compatible avec ces contrôles. Aucun GPIO n’est modifié par ce portage.
+## Backend : configuration nécessaire
 
-| Service / caractéristique | UUID |
+L’application utilise `https://fairest-one-documentation.vercel.app/api/`. Malgré son nom, cette adresse expose bien `/api/clients`. L’URL est publique ; aucune clé Supabase ou miroir n’est embarquée dans l’application.
+
+L’API Vercel doit disposer de :
+
+- `SUPABASE_URL` du bon projet ;
+- `SUPABASE_SECRET_KEY` contenant une **clé serveur secrète** `sb_secret_…` ou une ancienne clé `service_role`, jamais `sb_publishable_…` ;
+- `MIRROR_DEVICE_ID`, identifiant du miroir, différent de `native-ios` ;
+- `MIRROR_SIGNING_KEY`, chaîne privée d’au moins 32 caractères ASCII, identique à celle du firmware ;
+- `ADMIN_PASSWORD` pour l’administration.
+
+La clé configurée actuellement dans Vercel a été signalée par Sabrina comme `sb_publishable_…` : **elle doit être corrigée côté serveur avant de valider les enregistrements**. Ne pas partager les valeurs secrètes dans le chat et ne jamais les placer dans `EXPO_PUBLIC_*`. Un changement de variable Vercel nécessite un redéploiement du backend après validation ; il ne nécessite pas un nouveau build de l’application si l’URL reste identique.
+
+L’e-mail est stocké dans **Table Editor → public.clients.email**, pas dans Authentication → Users. Les logs seuls ne prouvent pas la création du client. L’association est réalisée seulement après la lecture de carte signée et la validation du backend.
+
+Les tables/fonctions de `../docs/supabase-schema.sql` et `../docs/supabase-nfc.sql` doivent être en place dans le projet Supabase visé. Vérifier et valider ces migrations avant toute application à une base existante. Aucun changement d’API ou de schéma supplémentaire n’est nécessaire pour le parcours iOS tout-BLE.
+
+## Firmware et protocole
+
+Utiliser le programme complet `../firmware/fairest_one/fairest_one.ino`, avec un `config.h` préparé à partir de `config.example.h` : clé privée de signature et PIN BLE personnel à six chiffres. Les GPIO existants sont conservés. Aucun flashage n’est réalisé automatiquement.
+
+Un ancien sketch de test qui annonce d’autres UUID ou transmet seulement `{"type":"card_scanned","uid":"…"}` n’est pas compatible avec le protocole signé de l’application et du backend.
+
+| Élément | UUID |
 |---|---|
 | Service | `83de1000-7a28-4b54-9815-47c0ae451001` |
 | Notifications | `83de1001-7a28-4b54-9815-47c0ae451001` |
-| Écriture avec réponse | `83de1002-7a28-4b54-9815-47c0ae451001` |
+| Écritures avec réponse | `83de1002-7a28-4b54-9815-47c0ae451001` |
 
-JSON UTF-8 terminé par `\n`, fragments de 20 octets, corrélation par défi `token`. Le téléphone relaie `card_scanned` puis `capture_simulated` avec leur preuve HMAC distincte. La clé de signature reste dans le firmware et Vercel. Voir [le protocole détaillé](../docs/ble-integration.md). Anti-rebond assuré par le firmware : retirer la carte au moins 600 ms avant de la représenter.
+JSON UTF-8 terminé par `\n`, fragments de 20 octets, événements corrélés par défi temporaire `token`. L’app réutilise `begin_registration`, `begin_recovery`, `begin_recognition`, `scan`, `capture` et `cancel` sur `POST /api/clients`. Le firmware produit des preuves HMAC avec des domaines distincts pour lecture et capture. La clé reste dans Vercel et le firmware. Voir [le protocole complet](../docs/ble-integration.md).
 
-## Validation et tests des deux cartes
+L’inscription et la récupération confirment la carte avec `recognized:true,capture:false`. Seul l’essayage reconnu envoie `capture:true`. Une erreur backend, un mauvais défi ou une preuve absente ne déclenche aucune capture. La présence d’un UID NFC n’est pas une authentification forte ; dans ce mode, le backend autorise la récupération sur une lecture physique signée du miroir de confiance.
 
-Contrôles logiciels effectués le 4 novembre 2026 : TypeScript, lint, 13 tests unitaires de flux/transports, 6 tests de l’API existante, génération des autorisations natives et export JavaScript/Hermes Android + iOS + web. `expo-doctor` : 20/21 contrôles passent ; le contrôle CocoaPods local échoue car l’outil n’est pas installé. Les versions de modules sont validées par `expo install --check`.
+## Android et EAS conservés
 
-**Pas encore effectués** : build natif signé EAS, installation et lecture physique des cartes, contrôle visuel dans un navigateur (outil indisponible). Le projet EAS `@sabristiti/fairest-one` est associé et connecté. L’environnement `preview` utilise `https://fairest-one-documentation.vercel.app/api/`, fourni par Sabrina ; cet endpoint répond en JSON avec contrôle d’accès. L’archive EAS complète a été inspectée : 26 fichiers mobiles, sans backend ni fichiers secrets. Premier build Android lancé : `2f56522f-870e-4e3c-8406-b75e62aeb5fb`.
+Android garde la lecture NFC du téléphone et l’accès personnel SecureStore pour l’inscription/récupération. Ce stockage est propre à l’installation : ne pas désinstaller l’application pour faire une mise à jour. Sur iOS, le parcours tout-BLE utilise l’autorisation signée du miroir et n’exige pas ce jeton du téléphone.
 
-L’audit npm conserve des alertes dans les dépendances Expo/Router et les outils, dont des alertes élevées (`decode-uri-component`, `zod`). `npm audit fix --ignore-scripts` n’a pas apporté de correctif compatible à toutes ces alertes. Ne pas utiliser `--force` : il propose notamment un changement de SDK incompatible. Réévaluer les correctifs avant diffusion publique ; ce portage est destiné aux tests internes.
+Le projet EAS est `@sabristiti/fairest-one`, ID `4e1ed398-0f6f-4c39-9841-94f4fbaf5c38`. Les profils `preview` (autonome) et `development` (Metro) restent dans `eas.json`. Les builds Android déjà envoyés sont des instantanés de leur code ; les modifications locales ultérieures ne les modifient pas.
 
-| Test matériel à réaliser sur chaque plateforme | Résultat attendu | État |
-|---|---|---|
-| Inscrire carte A + e-mail de test depuis le téléphone | Confirmation, une association | À faire |
-| Refaire l’inscription carte A / e-mail existant | Refus de doublon | À faire |
-| Connecter miroir, présenter carte A | LED verte, 2 bips, compte à rebours, un message enregistré | À faire |
-| Présenter carte B non inscrite | LED rouge, 3 bips, aucun message supplémentaire | À faire |
-| Récupérer carte A sur la même installation Expo | Messages de la session affichés | À faire |
-| Récupérer carte A sur un autre téléphone | Refus, aucune donnée personnelle affichée | À faire |
-| Maintenir carte A sur RC522 | Aucun doublon jusqu’au retrait de la carte | À faire |
-| Couper Bluetooth / quitter l’accueil / mettre en arrière-plan | Parcours interrompu, aucune capture non autorisée | À faire |
-| Couper Internet avant confirmation du backend | Erreur visible, aucun feu vert | À faire |
-| Refuser Bluetooth / désactiver NFC / ne présenter aucune carte | Erreur explicite ou timeout, possibilité de relancer | À faire |
+Le `.easignore` à la racine autorise les seules sources/configurations/assets nécessaires de `mobile/`, sans `.env`, backend, Flutter, base SQL, clés, `firmware/config.h` ou `node_modules`. L’archive complète a été inspectée avant le premier envoi.
 
-Commandes locales : `npm run typecheck`, `npm run lint`, `npm test`. API : `npm run test:api` depuis la racine.
+## Vérifications
 
-Références officielles : [client de développement](https://docs.expo.dev/develop/development-builds/introduction/), [distribution interne](https://docs.expo.dev/build/internal-distribution/), [NFC](https://github.com/revtel/react-native-nfc-manager), [BLE](https://github.com/dotintent/react-native-ble-plx).
+TypeScript, lint, 22 tests de flux/transports passent, dont inscription et récupération via miroir, preuve absente, mauvais défi, refus backend, carte inconnue, annulation et exclusion des opérations simultanées. L’export iOS passe. La génération iOS produit un fichier d’entitlements sans autorisation NFC.
+
+La compilation native iOS Release sans signature a réussi, avec un bundle JavaScript embarqué. La signature et l’installation attendent l’activation du mode développeur sur l’iPhone connecté. Les tests BLE sur le matériel réel restent à effectuer ; ne pas déduire leur résultat des tests logiciels. Un contrôle sans écriture de l’API active a reçu HTTP 503 « Configuration serveur incomplète » : vérifier les variables et l’environnement Vercel du domaine réellement utilisé avant les enregistrements.
+
+Les alertes npm de dépendances Expo/Router et d’outils restent à réévaluer avant diffusion publique. Ne pas appliquer `npm audit fix --force`, qui propose des changements de SDK incompatibles.
+
+| Test physique | Attendu |
+|---|---|
+| Inscrire carte A + e-mail via RC522 | Un client associé, sans capture |
+| Réinscrire carte A / e-mail existant | Refus de doublon |
+| Essayage avec carte A | Vert, 2 bips, compte à rebours et un message |
+| Essayage avec carte B inconnue | Rouge, 3 bips, aucun message supplémentaire |
+| Récupérer carte A via RC522 | Messages de la session sur l’iPhone, sans capture |
+| Maintenir carte A devant RC522 | Pas de doublons jusqu’au retrait |
+| Couper Bluetooth / quitter l’écran / arrière-plan | Annulation, sans capture non autorisée |
+| Erreur backend / preuve invalide | Erreur affichée, aucun feu vert pour une capture |
+
+Commandes : `npm run typecheck`, `npm run lint`, `npm test`. Les tests de l’API existante se lancent avec `npm run test:api` depuis la racine.
+
+Références : [développement local Expo](https://docs.expo.dev/develop/development-builds/introduction/), [signature Apple gratuite et limites](https://expo.dev/blog/apple-developer-program-explained-free-vs-paid), [clés Supabase](https://supabase.com/docs/guides/getting-started/api-keys).

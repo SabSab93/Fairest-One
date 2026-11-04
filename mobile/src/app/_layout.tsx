@@ -8,7 +8,7 @@ import { colors, Copy } from '../components/ui';
 export default function Layout() {
   const [loaded, error] = useFonts({ Cormorant: require('../../assets/fonts/CormorantGaramond-Variable.ttf') });
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', state => { if (state === 'background') stopHardware(); });
+    const subscription = AppState.addEventListener('change', state => { if (state === 'background') stopHardware('Lecture interrompue : l’application est passée en arrière-plan. Revenez puis relancez le scan.'); });
     return () => { subscription.remove(); stopHardware(); };
   }, []);
   if (!loaded && !error) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.paper }}><ActivityIndicator/><Copy>Fairest One</Copy></View>;

@@ -12,6 +12,9 @@
       "bundleIdentifier": "com.fairestone.expo",
       "config": {
         "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "Fairest One utilise le lecteur de cartes du miroir en Bluetooth pour inscrire votre carte, lancer un essayage et retrouver votre session."
       }
     },
     "android": {
@@ -21,7 +24,8 @@
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_ADMIN",
         "android.permission.BLUETOOTH_CONNECT"
-      ]
+      ],
+      "versionCode": 2
     },
     "web": {
       "favicon": "./assets/icon.png",
@@ -37,18 +41,11 @@
         }
       ],
       [
-        "react-native-nfc-manager",
-        {
-          "nfcPermission": "Fairest One lit votre carte NFC pour inscrire et retrouver votre session.",
-          "includeNdefEntitlement": false
-        }
-      ],
-      [
         "react-native-ble-plx",
         {
           "isBackgroundEnabled": false,
           "neverForLocation": true,
-          "bluetoothAlwaysPermission": "Fairest One se connecte au miroir pour déclencher et enregistrer les captures simulées."
+          "bluetoothAlwaysPermission": "Fairest One utilise le lecteur de cartes du miroir en Bluetooth pour inscrire votre carte, lancer un essayage et retrouver votre session."
         }
       ]
     ],

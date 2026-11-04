@@ -127,3 +127,99 @@ test('réponse backend incorrecte et refus backend sont des erreurs', async () =
   const denied = new ApiClient(() => 'https://test.example/api/', async () => new Response('{"error":"Accès refusé"}', { status: 403 }));
   await assert.rejects(denied.post({}), /Accès refusé/);
 });
+
+test('interruption en arrière-plan : raison conservée, aucune inscription envoyée', async () => {
+  let calls = 0;
+  const flow = new PhoneFlow(mockApi(() => { calls++; return { state: 'associated' }; }), {
+    readUid: signal => wait(new Promise(() => {}), signal, 1000, 'timeout'),
+  }, access());
+  const reading = flow.read('registration', 'a@example.fr');
+  flow.stop('Lecture interrompue : l’application est passée en arrière-plan.');
+  await assert.rejects(reading, /arrière-plan/);
+  assert.equal(calls, 0);
+  assert.equal(flow.getSnapshot().message, 'Lecture interrompue : l’application est passée en arrière-plan.');
+  assert.equal(flow.getSnapshot().busy, false);
+});
+
+test('arrêt explicite : le message reste Lecture annulée', async () => {
+  const flow = new PhoneFlow(mockApi(() => ({ state: 'associated' })), {
+    readUid: signal => wait(new Promise(() => {}), signal, 1000, 'timeout'),
+  }, access());
+  const reading = flow.read('registration', 'a@example.fr');
+  flow.stop();
+  await assert.rejects(reading, /Lecture annulée/);
+});
+
+test('iOS miroir : inscription signée avec e-mail, sans commande de capture', async () => {
+  const ble = new Ble(), calls: Record<string, unknown>[] = [];
+  ble.onSend = command => { if (command.type === 'scan') ble.listener?.({ type: 'card_scanned', token, uid, proof }); };
+  const flow = new MirrorFlow(mockApi(body => {
+    calls.push(body);
+    return body.action === 'begin_registration' ? { state: 'pending', token } : { state: 'associated' };
+  }), ble);
+  assert.equal((await flow.read('registration', ' A@EXAMPLE.FR ')).uid, uid);
+  assert.equal(calls[0].email, 'a@example.fr');
+  assert.deepEqual(calls[1], { action: 'scan', token, card_uid: uid, proof });
+  assert(ble.sent.some(c => c.type === 'card_result' && c.recognized === true && c.capture === false));
+  assert(!ble.sent.some(c => c.capture === true)); assert(ble.disconnected);
+});
+
+test('iOS miroir : récupération signée et affichage des messages existants', async () => {
+  const ble = new Ble();
+  ble.onSend = command => { if (command.type === 'scan') ble.listener?.({ type: 'card_scanned', token, uid, proof }); };
+  const flow = new MirrorFlow(mockApi(b => b.action === 'begin_recovery' ? { state: 'pending', token } : { state: 'recovered', client }), ble);
+  assert.deepEqual((await flow.read('recovery')).client?.messages, ['Capture simulée']);
+  assert(!ble.sent.some(c => c.capture === true)); assert(ble.disconnected);
+});
+
+test('iOS miroir : preuve absente ou événement d’un autre défi refusé avant envoi de l’UID', async () => {
+  for (const wrongToken of [false, true]) {
+    const ble = new Ble(), calls: Record<string, unknown>[] = [];
+    ble.onSend = c => { if (c.type === 'scan') ble.listener?.({ type: 'card_scanned', token: wrongToken ? 'd'.repeat(64) : token, uid }); };
+    const flow = new MirrorFlow(mockApi(body => { calls.push(body); return { state: 'pending', token }; }), ble, 10);
+    await assert.rejects(flow.read('registration', 'a@example.fr'), wrongToken ? /ne répond pas/ : /non signée/);
+    assert(!calls.some(c => c.action === 'scan')); assert(!ble.sent.some(c => c.recognized === true));
+  }
+});
+
+test('iOS miroir : erreur backend, aucune confirmation positive et déconnexion', async () => {
+  const ble = new Ble();
+  ble.onSend = c => { if (c.type === 'scan') ble.listener?.({ type: 'card_scanned', token, uid, proof }); };
+  const flow = new MirrorFlow(mockApi(b => {
+    if (b.action === 'begin_registration') return { state: 'pending', token };
+    if (b.action === 'cancel') return { state: 'cancelled' };
+    throw new ApiError('Service indisponible', 503);
+  }), ble);
+  await assert.rejects(flow.read('registration', 'a@example.fr'), /indisponible/);
+  assert(!ble.sent.some(c => c.recognized === true)); assert(ble.disconnected);
+});
+
+test('iOS miroir : récupération inconnue refusée sans capture', async () => {
+  const ble = new Ble();
+  ble.onSend = c => { if (c.type === 'scan') ble.listener?.({ type: 'card_scanned', token, uid, proof }); };
+  const flow = new MirrorFlow(mockApi(b => b.action === 'begin_recovery' ? { state: 'pending', token } : { state: 'unknown' }), ble);
+  await assert.rejects(flow.read('recovery'), /pas enregistrée/);
+  assert(ble.sent.some(c => c.recognized === false && c.capture === false));
+});
+
+test('iOS miroir : une lecture exclut les autres lectures et les essayages simultanés', async () => {
+  const ble = new Ble();
+  const flow = new MirrorFlow(mockApi(() => ({ state: 'pending', token })), ble);
+  const first = flow.read('registration', 'a@example.fr');
+  await assert.rejects(flow.read('recovery'), /déjà/);
+  await assert.rejects(flow.start(), /déjà/);
+  flow.stop(); await assert.rejects(first, Cancelled); assert(ble.disconnected);
+});
+
+test('iOS miroir : perte de l’accusé BLE après association, succès backend conservé', async () => {
+  const ble = new Ble();
+  ble.send = async c => {
+    ble.sent.push(c);
+    if (c.type === 'scan') ble.listener?.({ type: 'card_scanned', token, uid, proof });
+    if (c.type === 'card_result') throw new Error('Déconnexion');
+  };
+  const flow = new MirrorFlow(mockApi(b => b.action === 'begin_registration' ? { state: 'pending', token } : { state: 'associated' }), ble);
+  assert.equal((await flow.read('registration', 'a@example.fr')).state, 'associated');
+  assert.equal(flow.getSnapshot().stage, 'saved');
+  assert(!ble.sent.some(c => c.capture === true));
+});

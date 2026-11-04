@@ -1,5 +1,5 @@
 import type { Api, ClientRecord, FlowResult } from './types';
-import { Cancelled, checkActive } from './async';
+import { cancellation, checkActive } from './async';
 
 export class ApiError extends Error {
   constructor(message: string, public readonly status: number) { super(message); this.name = 'ApiError'; }
@@ -49,7 +49,7 @@ export class ApiClient implements Api {
       }
       return data;
     } catch (error) {
-      if (signal?.aborted) throw new Cancelled();
+      if (signal?.aborted) throw cancellation(signal);
       if (timedOut) throw new ApiError('Délai dépassé. Vérifiez Internet puis relancez la lecture.', 0);
       if (error instanceof ApiError) throw error;
       throw new ApiError('Connexion au service impossible. Vérifiez Internet puis réessayez.', 0);
