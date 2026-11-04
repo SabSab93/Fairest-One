@@ -1,5 +1,7 @@
 # Fairest-One : ESP32-C6 ↔ iPhone en BLE
 
+**Évolution actuelle :** l’inscription et la récupération utilisent désormais le NFC natif de l’iPhone par défaut. Voir [iphone-native-nfc.md](iphone-native-nfc.md) pour le parcours et la migration additionnelle. Ce document décrit le protocole du miroir et conserve les instructions du mode tout-BLE (`USE_PHONE_NFC=false`).
+
 Branche : `feat/esp32-c6-nfc-integration`. Aucun déploiement, flashage ni changement de Supabase distant n'est effectué par ces fichiers.
 
 ## Audit du dépôt avant modification

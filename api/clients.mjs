@@ -126,12 +126,51 @@ async function createClientRecord(request, supabase) {
   return json({created: true}, 201);
 }
 
+const phoneActions = new Map([
+  ['begin_phone_registration', 'begin_registration'],
+  ['begin_phone_recovery', 'begin_recovery'],
+  ['phone_scan', 'scan'],
+  ['phone_cancel', 'cancel'],
+]);
+
+// Native iPhone calls cannot carry a mirror proof. They use a personal,
+// random Keychain credential instead; knowledge of an NFC UID grants no reads.
+export async function handlePhoneNfc(supabase, body) {
+  const action = phoneActions.get(body.action);
+  const access = body.mobile_token;
+  if (typeof access !== 'string' || !/^[0-9a-f]{64}$/.test(access)) {
+    return json({error: 'Accès personnel de cet iPhone requis.'}, 401);
+  }
+  const generated = action.startsWith('begin_');
+  const token = generated ? randomBytes(32).toString('hex') : body.token;
+  if (typeof token !== 'string' || !/^[0-9a-f]{64}$/.test(token)) return json({error: 'Demande invalide.'}, 400);
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  if (action === 'begin_registration' && (email.length > 254 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))) {
+    return json({error: 'Adresse e-mail invalide.'}, 400);
+  }
+  const uid = typeof body.card_uid === 'string' ? body.card_uid.trim().toUpperCase() : '';
+  if (action === 'scan' && !/^(?:[0-9A-F]{8}|[0-9A-F]{14}|[0-9A-F]{20})$/.test(uid)) {
+    return json({error: 'Carte NFC invalide.'}, 400);
+  }
+  const hash = (value) => createHash('sha256').update(value).digest('hex');
+  const {data, error} = await supabase.rpc('phone_nfc_operation', {
+    p_action: action, p_hash: hash(token), p_access_hash: hash(access), p_email: email, p_uid: uid,
+  });
+  if (error) {
+    console.error('Phone NFC operation failed:', error.code);
+    return json({error: 'Service NFC indisponible. Vérifiez la configuration serveur.'}, 502);
+  }
+  if (data.error) return json(data, data.status ?? 409);
+  return json({...data, ...(generated ? {token} : {})});
+}
+
 // Flutter relays BLE proofs; the dedicated mirror key never reaches the app.
 export async function handleNfc(request, supabase, body) {
   const action = body?.action;
+  if (phoneActions.has(action)) return handlePhoneNfc(supabase, body);
   const deviceId = process.env.MIRROR_DEVICE_ID;
   const key = process.env.MIRROR_SIGNING_KEY;
-  if (!deviceId || !key || key.length < 32) return json({error: 'Configuration miroir incomplète.'}, 503);
+  if (!deviceId || deviceId === 'native-ios' || !key || key.length < 32) return json({error: 'Configuration miroir incomplète.'}, 503);
   if (!['begin_registration','begin_recovery','begin_recognition','scan','capture','cancel'].includes(action)) {
     return json({error: 'Action inconnue.'}, 400);
   }

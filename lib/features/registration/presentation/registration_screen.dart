@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../nfc/data/phone_nfc_flow_controller.dart';
 import '../data/client_store.dart';
 import '../../mirror/data/nfc_flow_controller.dart';
 
@@ -11,6 +12,8 @@ class RegistrationScreen extends StatefulWidget {
     super.key,
     this.clientStore = const ConfiguredClientStore(),
     this.useMockIot = AppConfig.useMockIot,
+    this.usePhoneNfc = AppConfig.usePhoneNfc,
+    this.phoneNfcController,
     this.nfcController,
   });
 
@@ -18,6 +21,8 @@ class RegistrationScreen extends StatefulWidget {
 
   final ClientStore clientStore;
   final bool useMockIot;
+  final bool usePhoneNfc;
+  final PhoneNfcFlowController? phoneNfcController;
   final NfcFlowController? nfcController;
 
   @override
@@ -25,6 +30,14 @@ class RegistrationScreen extends StatefulWidget {
 }
 
 class _RegistrationScreenState extends State<RegistrationScreen> {
+  PhoneNfcFlowController get _phoneNfc =>
+      widget.phoneNfcController ?? PhoneNfcFlowController.instance;
+  ValueNotifier<String> get _status =>
+      widget.usePhoneNfc ? _phoneNfc.status : _nfc.status;
+  Future<Map<String, dynamic>> _read(String purpose, {String? email}) =>
+      widget.usePhoneNfc
+      ? _phoneNfc.read(purpose, email: email)
+      : _nfc.read(purpose, email: email);
   NfcFlowController get _nfc =>
       widget.nfcController ?? NfcFlowController.instance;
   final _formKey = GlobalKey<FormState>();
@@ -36,7 +49,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   @override
   void dispose() {
-    if (!widget.useMockIot) _nfc.stop();
+    if (!widget.useMockIot) {
+      if (widget.usePhoneNfc) {
+        _phoneNfc.stop();
+      } else {
+        _nfc.stop();
+      }
+    }
     _emailController.dispose();
     _cardController.dispose();
     super.dispose();
@@ -64,7 +83,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     if (!widget.useMockIot) {
       try {
         if (!_associated) {
-          final result = await _nfc.read(
+          final result = await _read(
             'registration',
             email: _emailController.text,
           );
@@ -78,11 +97,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         }
         if (!mounted) return;
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(_nfc.status.value)));
+            .showSnackBar(SnackBar(content: Text(_status.value)));
       } catch (_) {
         if (mounted) {
           ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(_nfc.status.value)));
+              .showSnackBar(SnackBar(content: Text(_status.value)));
         }
       } finally {
         if (mounted) setState(() => _isSaving = false);
@@ -229,10 +248,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   _CardStatus(
                     isAssociated: _cardController.text.isNotEmpty,
                     useMockIot: widget.useMockIot,
+                    usePhoneNfc: widget.usePhoneNfc,
                   ),
                   if (!widget.useMockIot && _isSaving)
                     ValueListenableBuilder<String>(
-                      valueListenable: _nfc.status,
+                      valueListenable: _status,
                       builder: (context, value, _) =>
                           Semantics(liveRegion: true, child: Text(value)),
                     ),
@@ -267,10 +287,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 }
 
 class _CardStatus extends StatelessWidget {
-  const _CardStatus({required this.isAssociated, required this.useMockIot});
+  const _CardStatus({
+    required this.isAssociated,
+    required this.useMockIot,
+    required this.usePhoneNfc,
+  });
 
   final bool isAssociated;
   final bool useMockIot;
+  final bool usePhoneNfc;
 
   @override
   Widget build(BuildContext context) {
@@ -290,6 +315,8 @@ class _CardStatus extends StatelessWidget {
                 ? 'Carte prête pour l’essayage au miroir.'
                 : useMockIot
                 ? 'Touchez l’icône pour simuler une carte.'
+                : usePhoneNfc
+                ? 'Touchez « CRÉER LA SESSION », puis approchez la carte du haut de l’iPhone.'
                 : 'Présentez la carte au lecteur de la borne.',
             style: Theme.of(context).textTheme.bodySmall,
           ),

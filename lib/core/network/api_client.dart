@@ -12,6 +12,8 @@ class ApiClient {
   final http.Client _client;
   final Uri _baseUri;
 
+  bool get usesHttps => _baseUri.scheme == 'https';
+
   Future<http.Response> get(
     String path, {
     Map<String, String> headers = const {},

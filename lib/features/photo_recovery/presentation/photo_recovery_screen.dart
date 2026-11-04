@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../nfc/data/phone_nfc_flow_controller.dart';
 import '../../registration/data/client_store.dart';
 import '../../mirror/data/nfc_flow_controller.dart';
 import '../../registration/domain/client_record.dart';
@@ -13,6 +14,8 @@ class PhotoRecoveryScreen extends StatefulWidget {
     this.clientStore = const ConfiguredClientStore(),
     this.nfcController,
     this.useMockIot = AppConfig.useMockIot,
+    this.usePhoneNfc = AppConfig.usePhoneNfc,
+    this.phoneNfcController,
   });
 
   static const String routeName = 'photo-recovery';
@@ -20,12 +23,22 @@ class PhotoRecoveryScreen extends StatefulWidget {
   final ClientStore clientStore;
   final NfcFlowController? nfcController;
   final bool useMockIot;
+  final bool usePhoneNfc;
+  final PhoneNfcFlowController? phoneNfcController;
 
   @override
   State<PhotoRecoveryScreen> createState() => _PhotoRecoveryScreenState();
 }
 
 class _PhotoRecoveryScreenState extends State<PhotoRecoveryScreen> {
+  PhoneNfcFlowController get _phoneNfc =>
+      widget.phoneNfcController ?? PhoneNfcFlowController.instance;
+  ValueNotifier<String> get _status =>
+      widget.usePhoneNfc ? _phoneNfc.status : _nfc.status;
+  Future<Map<String, dynamic>> _read(String purpose, {String? email}) =>
+      widget.usePhoneNfc
+      ? _phoneNfc.read(purpose, email: email)
+      : _nfc.read(purpose, email: email);
   NfcFlowController get _nfc =>
       widget.nfcController ?? NfcFlowController.instance;
   ClientRecord? _client;
@@ -38,7 +51,7 @@ class _PhotoRecoveryScreenState extends State<PhotoRecoveryScreen> {
     try {
       if (!widget.useMockIot) {
         setState(() => _client = null);
-        final result = await _nfc.read('recovery');
+        final result = await _read('recovery');
         if (!mounted) return;
         if (result['state'] == 'recovered') {
           final row = result['client'] as Map<String, dynamic>;
@@ -54,7 +67,7 @@ class _PhotoRecoveryScreenState extends State<PhotoRecoveryScreen> {
           );
         } else {
           ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(_nfc.status.value)));
+              .showSnackBar(SnackBar(content: Text(_status.value)));
         }
         return;
       }
@@ -77,7 +90,7 @@ class _PhotoRecoveryScreenState extends State<PhotoRecoveryScreen> {
           content: Text(
             widget.useMockIot
                 ? 'Impossible de rechercher cette carte.'
-                : _nfc.status.value,
+                : _status.value,
           ),
         ),
       );
@@ -88,7 +101,13 @@ class _PhotoRecoveryScreenState extends State<PhotoRecoveryScreen> {
 
   @override
   void dispose() {
-    if (!widget.useMockIot) _nfc.stop();
+    if (!widget.useMockIot) {
+      if (widget.usePhoneNfc) {
+        _phoneNfc.stop();
+      } else {
+        _nfc.stop();
+      }
+    }
     super.dispose();
   }
 
@@ -126,10 +145,11 @@ class _PhotoRecoveryScreenState extends State<PhotoRecoveryScreen> {
                     isReading: _isReading,
                     onRead: _readCard,
                     useMockIot: widget.useMockIot,
+                    usePhoneNfc: widget.usePhoneNfc,
                   ),
                   if (_isReading && !widget.useMockIot)
                     ValueListenableBuilder<String>(
-                      valueListenable: _nfc.status,
+                      valueListenable: _status,
                       builder: (context, value, _) =>
                           Semantics(liveRegion: true, child: Text(value)),
                     ),
@@ -153,12 +173,14 @@ class _ReaderPanel extends StatelessWidget {
     required this.isReading,
     required this.onRead,
     required this.useMockIot,
+    required this.usePhoneNfc,
   });
 
   final ClientRecord? client;
   final bool isReading;
   final VoidCallback onRead;
   final bool useMockIot;
+  final bool usePhoneNfc;
 
   @override
   Widget build(BuildContext context) {
@@ -189,6 +211,10 @@ class _ReaderPanel extends StatelessWidget {
             Text(
               isDetected
                   ? client!.email
+                  : useMockIot
+                  ? 'Touchez le bouton pour simuler une carte.'
+                  : usePhoneNfc
+                  ? 'Touchez « LIRE LA CARTE », puis approchez la carte du haut de l’iPhone.'
                   : 'Approchez la carte du lecteur de la borne.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium,
