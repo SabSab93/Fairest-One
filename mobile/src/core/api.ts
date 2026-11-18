@@ -1,4 +1,4 @@
-import type { Api, ClientRecord, FlowResult } from './types';
+import type { Api, ClientRecord, FlowResult, SessionPhoto } from './types';
 import { cancellation, checkActive } from './async';
 
 export class ApiError extends Error {
@@ -13,6 +13,15 @@ export function apiBase(value: string | undefined): string {
   }
   return url.toString();
 }
+function isSessionPhoto(value: unknown): value is SessionPhoto {
+  if (!value || typeof value !== 'object') return false;
+  const photo = value as Record<string, unknown>;
+  if (typeof photo.id !== 'string' || typeof photo.created_at !== 'string' || typeof photo.url !== 'string') return false;
+  try {
+    const url = new URL(photo.url);
+    return url.protocol === 'https:' && !url.username && !url.password;
+  } catch { return false; }
+}
 export function clientRecord(value: unknown): ClientRecord {
   if (!value || typeof value !== 'object') throw new ApiError('Réponse client invalide.', 502);
   const row = value as Record<string, unknown>;
@@ -23,6 +32,7 @@ export function clientRecord(value: unknown): ClientRecord {
     card_uid: typeof row.card_uid === 'string' ? row.card_uid : null,
     photo_count: typeof row.photo_count === 'number' ? row.photo_count : 0,
     messages: Array.isArray(row.messages) ? row.messages.filter((v): v is string => typeof v === 'string') : [],
+    photos: Array.isArray(row.photos) ? row.photos.filter(isSessionPhoto) : [],
   };
 }
 export class ApiClient implements Api {

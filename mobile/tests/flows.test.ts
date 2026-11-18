@@ -116,6 +116,16 @@ test('déconnexion ou absence de réponse : abandon sans capture', async () => {
     assert(!ble.sent.some(c => c.recognized === true)); assert(ble.disconnected);
   }
 });
+test('la récupération HTTP transmet les vraies photos signées à la galerie', async () => {
+  const api = new ApiClient(() => 'https://test.example/api/', async () => Response.json({
+    state: 'recovered',
+    client: { ...client, photos: [...client.photos, { ...client.photos[0], url: 'http://test.example/photo.jpg' }, null] },
+  }));
+  const result = await api.post({ action: 'scan', token, card_uid: uid, proof });
+  assert.equal(result.state, 'recovered');
+  assert.deepEqual(result.client?.photos, client.photos);
+});
+
 test('transport HTTP : pas de clé admin sur les opérations personnelles', async () => {
   let headers: HeadersInit | undefined;
   const fetcher: typeof fetch = async (_url, init) => { headers = init?.headers; return new Response(JSON.stringify({ state: 'pending', token }), { status: 200 }); };
