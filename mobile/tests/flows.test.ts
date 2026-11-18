@@ -8,7 +8,7 @@ import { BleFrames, commandFrames } from '../src/core/ble-protocol';
 import { Cancelled, normalizeUid, wait } from '../src/core/async';
 import type { AccessStore, Api, BleEvent, FlowResult, MirrorTransport } from '../src/core/types';
 const token = 'a'.repeat(64), proof = 'b'.repeat(64), uid = '04DE3A36D62A81';
-const client = { id: 'one', email: 'a@example.fr', card_uid: uid, created_at: '2026-11-04', photo_count: 1, messages: ['Capture simulée'] };
+const client = { id: 'one', email: 'a@example.fr', card_uid: uid, created_at: '2026-11-04', photo_count: 1, messages: [], photos: [{ id: 'photo', created_at: '2026-11-04', url: 'https://example.test/essayage.jpg' }] };
 function access(initial: string | null = null): AccessStore {
   let value = initial;
   return { read: async () => value, save: async next => { value = next; }, generate: async () => 'c'.repeat(64) };
@@ -30,7 +30,7 @@ test('inscription : UID normalisé et accès conservé avant association', async
 });
 test('récupération avec le même accès : messages de la session', async () => {
   const flow = new PhoneFlow(mockApi(body => body.action === 'begin_phone_recovery' ? { state: 'pending', token } : { state: 'recovered', client }), { readUid: async () => uid }, access(token));
-  assert.deepEqual((await flow.read('recovery')).client?.messages, ['Capture simulée']);
+  assert.deepEqual((await flow.read('recovery')).client?.photos, client.photos);
 });
 test('un autre téléphone sans accès ne récupère rien et ne contacte pas le backend', async () => {
   let calls = 0;
@@ -88,13 +88,13 @@ test('capture signée autorisée, enregistrée puis accusée, répétition rése
   const ble = new Ble(); let saves = 0; let flow: MirrorFlow;
   ble.onSend = c => {
     if (c.type === 'scan') ble.listener?.({ type: 'card_scanned', token, uid, proof });
-    if (c.type === 'card_result' && c.recognized === true) ble.listener?.({ type: 'capture_simulated', token, uid, proof });
+    if (c.type === 'card_result' && c.recognized === true) ble.listener?.({ type: 'photo_captured', token, uid, proof });
     if (c.type === 'capture_saved') flow.stop();
   };
   flow = new MirrorFlow(mockApi(b => {
     if (b.action === 'begin_recognition') return { state: 'pending', token };
     if (b.action === 'scan') return { state: 'recognized' };
-    if (b.action === 'capture') { saves++; if (saves === 1) throw new ApiError('timeout', 0); return { state: 'captured' }; }
+    if (b.action === 'capture_status') { saves++; if (saves === 1) throw new ApiError('timeout', 0); return { state: 'captured' }; }
     return { state: 'cancelled' };
   }), ble);
   await assert.rejects(flow.start(), Cancelled);
@@ -173,7 +173,7 @@ test('iOS miroir : récupération signée et affichage des messages existants', 
   const ble = new Ble();
   ble.onSend = command => { if (command.type === 'scan') ble.listener?.({ type: 'card_scanned', token, uid, proof }); };
   const flow = new MirrorFlow(mockApi(b => b.action === 'begin_recovery' ? { state: 'pending', token } : { state: 'recovered', client }), ble);
-  assert.deepEqual((await flow.read('recovery')).client?.messages, ['Capture simulée']);
+  assert.deepEqual((await flow.read('recovery')).client?.photos, client.photos);
   assert(!ble.sent.some(c => c.capture === true)); assert(ble.disconnected);
 });
 
@@ -258,7 +258,7 @@ test('iPhone : un bouton déclenche un seul essayage et libère le lecteur', asy
   const ble = new Ble(), calls: Record<string, unknown>[] = [];
   ble.onSend = c => {
     if (c.type === 'scan') ble.listener?.({ type: 'card_scanned', token, uid, proof });
-    if (c.type === 'card_result' && c.capture === true) ble.listener?.({ type: 'capture_simulated', token, uid, proof });
+    if (c.type === 'card_result' && c.capture === true) ble.listener?.({ type: 'photo_captured', token, uid, proof });
   };
   const flow = new MirrorFlow(mockApi(body => {
     calls.push(body);
@@ -267,12 +267,12 @@ test('iPhone : un bouton déclenche un seul essayage et libère le lecteur', asy
   }), ble);
   assert.equal((await flow.tryOn()).state, 'captured');
   assert.equal(calls.filter(c => c.action === 'begin_recognition').length, 1);
-  assert.equal(calls.filter(c => c.action === 'capture').length, 1);
+  assert.equal(calls.filter(c => c.action === 'capture_status').length, 1);
   assert.equal(flow.getSnapshot().busy, false);
   assert.equal(flow.getSnapshot().stage, 'saved');
   assert(ble.disconnected);
   await flow.tryOn();
-  assert.equal(calls.filter(c => c.action === 'capture').length, 2);
+  assert.equal(calls.filter(c => c.action === 'capture_status').length, 2);
 });
 
 test('iPhone : une carte inconnue termine l’essayage sans capture', async () => {
@@ -284,7 +284,7 @@ test('iPhone : une carte inconnue termine l’essayage sans capture', async () =
   }), ble);
   assert.equal((await flow.tryOn()).state, 'unknown');
   assert.equal(flow.getSnapshot().stage, 'error');
-  assert(!calls.some(c => c.action === 'capture'));
+  assert(!calls.some(c => c.action === 'capture_status'));
   assert(!ble.sent.some(c => c.capture === true));
   assert(ble.disconnected);
 });
@@ -297,7 +297,7 @@ test('iPhone : capture sauvegardée puis accusé BLE perdu, succès conservé sa
     ble.send = async c => {
       ble.sent.push(c);
       if (c.type === 'scan') ble.listener?.({ type: 'card_scanned', token, uid, proof });
-      if (c.type === 'card_result') ble.listener?.({ type: 'capture_simulated', token, uid, proof });
+      if (c.type === 'card_result') ble.listener?.({ type: 'photo_captured', token, uid, proof });
       if (c.type === 'capture_saved') throw new Error('Déconnexion');
     };
     const flow = new MirrorFlow(mockApi(body => {
@@ -309,7 +309,7 @@ test('iPhone : capture sauvegardée puis accusé BLE perdu, succès conservé sa
     else assert.equal((await flow.tryOn()).state, 'captured');
     assert.equal(flow.getSnapshot().stage, 'saved');
     assert.match(flow.getSnapshot().message, /enregistrée.*interrompue/);
-    assert.equal(calls.filter(c => c.action === 'capture').length, 1);
+    assert.equal(calls.filter(c => c.action === 'capture_status').length, 1);
     assert.equal(calls.filter(c => c.action === 'begin_recognition').length, 1);
     assert(!calls.some(c => c.action === 'cancel'));
     assert(!ble.sent.some(c => c.type === 'cancel'));
@@ -330,7 +330,7 @@ test('iPhone : annuler le compte à rebours interdit la sauvegarde et libère le
     return { state: body.action === 'scan' ? 'recognized' : 'cancelled' };
   }), ble);
   await assert.rejects(flow.tryOn(), Cancelled);
-  assert(!calls.some(c => c.action === 'capture'));
+  assert(!calls.some(c => c.action === 'capture_status'));
   assert(ble.sent.some(c => c.type === 'cancel'));
   assert.equal(flow.getSnapshot().busy, false);
   assert(ble.disconnected);
@@ -341,7 +341,7 @@ test('iPhone : inscription, essayages successifs puis récupération utilisent l
   let registered = false, purpose = '', captures = 0;
   ble.onSend = c => {
     if (c.type === 'scan') ble.listener?.({ type: 'card_scanned', token, uid, proof });
-    if (c.type === 'card_result' && c.capture === true) ble.listener?.({ type: 'capture_simulated', token, uid, proof });
+    if (c.type === 'card_result' && c.capture === true) ble.listener?.({ type: 'photo_captured', token, uid, proof });
   };
   const flow = new MirrorFlow(mockApi(body => {
     if (String(body.action).startsWith('begin_')) {
@@ -351,7 +351,7 @@ test('iPhone : inscription, essayages successifs puis récupération utilisent l
     }
     assert.equal(body.card_uid, uid);
     assert.equal(body.proof, proof);
-    if (body.action === 'capture') { captures++; return { state: 'captured' }; }
+    if (body.action === 'capture_status') { captures++; return { state: 'captured' }; }
     if (purpose === 'begin_registration') { registered = true; return { state: 'associated' }; }
     assert(registered);
     return purpose === 'begin_recovery'

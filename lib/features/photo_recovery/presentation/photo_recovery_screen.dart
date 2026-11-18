@@ -43,6 +43,7 @@ class _PhotoRecoveryScreenState extends State<PhotoRecoveryScreen> {
   NfcFlowController get _nfc =>
       widget.nfcController ?? NfcFlowController.instance;
   ClientRecord? _client;
+  List<Uri> _photos = const [];
   bool _isReading = false;
 
   Future<void> _readCard() async {
@@ -51,21 +52,27 @@ class _PhotoRecoveryScreenState extends State<PhotoRecoveryScreen> {
     setState(() => _isReading = true);
     try {
       if (!widget.useMockIot) {
-        setState(() => _client = null);
+        setState(() {
+          _client = null;
+          _photos = const [];
+        });
         final result = await _read('recovery');
         if (!mounted) return;
         if (result['state'] == 'recovered') {
           final row = result['client'] as Map<String, dynamic>;
-          setState(
-            () => _client = ClientRecord(
+          setState(() {
+            _photos = (row['photos'] as List? ?? const [])
+                .map((photo) => Uri.parse(photo['url'] as String))
+                .toList(growable: false);
+            _client = ClientRecord(
               id: row['id'] as String,
               email: row['email'] as String,
               cardUid: row['card_uid'] as String?,
               photoCount: (row['photo_count'] as num).toInt(),
               createdAt: DateTime.parse(row['created_at'] as String),
               messages: (row['messages'] as List).cast<String>(),
-            ),
-          );
+            );
+          });
         } else {
           ScaffoldMessenger.of(context)
               .showSnackBar(SnackBar(content: Text(_status.value)));
@@ -156,7 +163,7 @@ class _PhotoRecoveryScreenState extends State<PhotoRecoveryScreen> {
                     ),
                   if (_client != null) ...[
                     const SizedBox(height: 28),
-                    _PhotoResult(client: _client!),
+                    _PhotoResult(photos: _photos),
                   ],
                 ],
               ),
@@ -241,9 +248,9 @@ class _ReaderPanel extends StatelessWidget {
 }
 
 class _PhotoResult extends StatelessWidget {
-  const _PhotoResult({required this.client});
+  const _PhotoResult({required this.photos});
 
-  final ClientRecord client;
+  final List<Uri> photos;
 
   @override
   Widget build(BuildContext context) {
@@ -270,22 +277,50 @@ class _PhotoResult extends StatelessWidget {
                 const SizedBox(width: 16),
                 Expanded(
                   child: Text(
-                    client.messages.isNotEmpty
-                        ? '${client.messages.length} captures simulées enregistrées.'
-                        : client.photoCount == 0
-                        ? 'Aucune photo synchronisée pour cette session.'
-                        : '${client.photoCount} photos prêtes à sélectionner.',
+                    photos.isEmpty
+                        ? 'Aucune photo pour cette session.'
+                        : '${photos.length} photo(s) dans cette session.',
                   ),
                 ),
               ],
             ),
           ),
         ),
-        for (final message in client.messages)
-          Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: Text(message),
+        if (photos.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              for (final (index, photo) in photos.indexed)
+                Semantics(
+                  button: true,
+                  label: 'Agrandir la photo ${index + 1}',
+                  child: InkWell(
+                    onTap: () => showDialog<void>(
+                      context: context,
+                      builder: (context) => Dialog(
+                        child: InteractiveViewer(
+                          child: Image.network(photo.toString()),
+                        ),
+                      ),
+                    ),
+                    child: Image.network(
+                      photo.toString(),
+                      width: 140,
+                      height: 105,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => const SizedBox(
+                        width: 140,
+                        height: 105,
+                        child: Center(child: Icon(Icons.broken_image_outlined)),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
+        ],
       ],
     );
   }

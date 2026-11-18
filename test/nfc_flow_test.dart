@@ -33,13 +33,13 @@ class FakeBle implements MirrorBleTransport {
     if (type == 'scan' ||
         (type == 'card_result' && command['capture'] == true)) {
       source.add({
-        'type': type == 'scan' ? 'card_scanned' : 'capture_simulated',
+        'type': type == 'scan' ? 'card_scanned' : 'photo_captured',
         'token': 'wrong-token',
         'uid': 'FFFFFFFF',
         'proof': 'bad',
       });
       source.add({
-        'type': type == 'scan' ? 'card_scanned' : 'capture_simulated',
+        'type': type == 'scan' ? 'card_scanned' : 'photo_captured',
         'token': command['token'],
         'uid': 'A1B2C3D4',
         'proof': 'test-proof',
@@ -53,7 +53,7 @@ void main() {
   test('JSON lines tolerate fragmented UTF-8 and multiple frames', () {
     final decoder = BleJsonDecoder();
     final bytes = utf8.encode(
-      '${jsonEncode({'type': 'capture_simulated', 'label': 'Essayage effectué.'})}\n',
+      '${jsonEncode({'type': 'photo_captured', 'label': 'Essayage effectué.'})}\n',
     );
     final messages = <Map<String, dynamic>>[];
     for (final byte in bytes) {
@@ -66,7 +66,7 @@ void main() {
   for (final recovery in [false, true]) {
     testWidgets(
       recovery
-          ? 'recovery screen renders three backend messages'
+          ? 'recovery screen renders three camera photos'
           : 'existing registration form confirms BLE association',
       (tester) async {
         final ble = FakeBle();
@@ -88,11 +88,10 @@ void main() {
                           'card_uid': 'A1B2C3D4',
                           'created_at': '2026-11-04T10:00:00Z',
                           'photo_count': 3,
-                          'messages': List.generate(
-                            3,
-                            (i) =>
-                                'Photo simulée n°${i + 1} — Essayage effectué.',
-                          ),
+                          'messages': [],
+                          'photos': List.generate(3, (i) {
+                            return {'url': 'https://example.test/photo-$i.jpg'};
+                          }),
                         },
                       }
                     : {'state': 'associated'},
@@ -137,10 +136,7 @@ void main() {
         });
         await tester.pumpAndSettle();
         if (recovery) {
-          expect(
-            find.text('Photo simulée n°3 — Essayage effectué.'),
-            findsOneWidget,
-          );
+          expect(find.text('3 photo(s) dans cette session.'), findsOneWidget);
           expect(find.text('a@example.test'), findsOneWidget);
         } else {
           expect(find.text('SESSION CRÉÉE'), findsOneWidget);
@@ -161,7 +157,6 @@ void main() {
     test('BLE scan routes $state through the existing HTTP service', () async {
       final ble = FakeBle();
       final actions = <String>[];
-      var captureAttempts = 0;
       final api = ApiClient(
         baseUrl: 'https://example.test/api/',
         client: MockClient((request) async {
@@ -174,9 +169,6 @@ void main() {
           if (action == 'scan') {
             expect(body['card_uid'], 'A1B2C3D4');
             return http.Response(jsonEncode({'state': state}), 200);
-          }
-          if (action == 'capture' && captureAttempts++ == 0) {
-            return http.Response('{"error":"network"}', 502);
           }
           return http.Response('{"state":"captured"}', 200);
         }),
@@ -198,8 +190,8 @@ void main() {
         expect(confirmation['recognized'], state != 'unknown');
         expect(confirmation['capture'], state == 'recognized');
         expect(
-          actions.where((a) => a == 'capture').length,
-          state == 'recognized' ? 2 : 0,
+          actions.where((a) => a == 'capture_status').length,
+          state == 'recognized' ? 1 : 0,
         );
       } finally {
         WidgetsBinding.instance.removeObserver(flow);

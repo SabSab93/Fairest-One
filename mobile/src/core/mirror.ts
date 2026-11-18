@@ -19,7 +19,12 @@ export class MirrorFlow extends Flow {
       unsubscribe = this.ble.subscribe(event => {
         if (event instanceof Error) return finish(undefined, event);
         if (event.token !== token) return;
-        if (event.type === 'error') return finish(undefined, new Error('Le miroir a interrompu la lecture. Réessayez.'));
+        if (event.type === 'error') {
+          const message = event.code === 'photo_upload_failed' ? 'La photo n’a pas pu être enregistrée. Vérifiez la connexion du miroir.'
+            : event.code === 'camera_capture_failed' || event.code === 'camera_unavailable' ? 'Le miroir n’a pas pu prendre la photo.'
+            : 'Le miroir a interrompu la lecture. Réessayez.';
+          return finish(undefined, new Error(message));
+        }
         if (event.type === type) finish(event);
       });
       signal.addEventListener('abort', abort, { once: true });
@@ -106,9 +111,9 @@ export class MirrorFlow extends Flow {
       }
       if (result.state !== 'recognized') throw new Error('Le service n’a pas autorisé la capture.');
       this.publish('Carte reconnue · compte à rebours 3, 2, 1', 'countdown');
-      const event = await this.event('capture_simulated', token, { type: 'card_result', token, recognized: true, capture: true }, signal);
+      const event = await this.event('photo_captured', token, { type: 'card_result', token, recognized: true, capture: true }, signal);
       if (normalizeUid(event.uid) !== uid || !event.proof || !/^[0-9a-f]{64}$/.test(event.proof)) throw new Error('Confirmation de capture invalide.');
-      const body = { action: 'capture', token, card_uid: uid, proof: event.proof };
+      const body = { action: 'capture_status', token, card_uid: uid, proof: event.proof };
       let saved;
       try { saved = await this.api.post(body, signal); }
       catch (error) {
@@ -123,10 +128,10 @@ export class MirrorFlow extends Flow {
       try { await this.ble.send({ type: 'capture_saved', token }, signal); }
       catch {
         checkActive(signal);
-        this.publish('Capture simulée enregistrée ; connexion au miroir interrompue.', 'saved');
+        this.publish('Photo enregistrée ; connexion au miroir interrompue.', 'saved');
         return { state: 'captured', uid, code: 'mirror_disconnected_after_save' };
       }
-      this.publish('Capture simulée enregistrée', 'saved');
+      this.publish('Photo enregistrée', 'saved');
       return { state: 'captured', uid };
     } finally {
       if (!completed && token) {

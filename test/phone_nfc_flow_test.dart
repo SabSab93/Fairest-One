@@ -103,10 +103,10 @@ Map<String, Object?> recovered() => {
     'card_uid': '04010203040506',
     'photo_count': 3,
     'created_at': '2026-11-04T10:00:00Z',
-    'messages': List.generate(
-      3,
-      (i) => 'Photo simulée n°${i + 1} — Essayage effectué.',
-    ),
+    'messages': [],
+    'photos': List.generate(3, (i) {
+      return {'url': 'https://example.test/photo-$i.jpg'};
+    }),
   },
 };
 void main() {
@@ -242,10 +242,7 @@ void main() {
           if (purpose == 'registration') {
             expect(find.text('SESSION CRÉÉE'), findsOneWidget);
           } else {
-            expect(
-              find.text('Photo simulée n°3 — Essayage effectué.'),
-              findsOneWidget,
-            );
+            expect(find.text('3 photo(s) dans cette session.'), findsOneWidget);
             expect(find.text('phone@example.test'), findsOneWidget);
           }
           expect(tester.takeException(), isNull);

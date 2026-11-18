@@ -6,8 +6,8 @@ test('le transport Wi-Fi utilise une adresse locale et ne suit pas les redirecti
   for (const invalid of ['example.com', '8.8.8.8', '172.32.0.1', '192.168.0.256', 'http://172.20.10.4']) {
     assert.throws(() => mirrorAddress(invalid));
   }
-  const mirror = new WifiMirror(() => '172.20.10.4', async (url, options) => {
-    assert.equal(url, 'http://172.20.10.4/mirror/status');
+  const mirror = new WifiMirror(async () => '172.20.10.8', async (url, options) => {
+    assert.equal(url, 'http://172.20.10.8/mirror/status');
     assert.equal(options?.redirect, 'error');
     return new Response('fairest-one-wifi-v1');
   });
