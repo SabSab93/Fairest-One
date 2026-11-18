@@ -1,12 +1,10 @@
 // ESP32-C6, Arduino ESP32 core 3.3.12; MFRC522 1.4.12; ArduinoJson 7.4.2.
-// BLE only: no WiFi/HTTP library and no Supabase credentials.
+// Wi-Fi transport for the iPhone mirror. The Supabase key stays on the backend.
 #include <Arduino.h>
 #include <SPI.h>
 #include <MFRC522.h>
-#include <BLEDevice.h>
-#include <BLEServer.h>
-#include <BLEUtils.h>
-#include <BLE2902.h>
+#include <WiFi.h>
+#include <WebServer.h>
 #include <ArduinoJson.h>
 #include <mbedtls/md.h>
 #include "config.h"
@@ -21,17 +19,11 @@
 #define MOSI_PIN 18
 #define MISO_PIN 2
 
-const char *SERVICE_UUID = "83de1000-7a28-4b54-9815-47c0ae451001";
-const char *EVENTS_UUID = "83de1001-7a28-4b54-9815-47c0ae451001";
-const char *COMMANDS_UUID = "83de1002-7a28-4b54-9815-47c0ae451001";
 MFRC522 reader(SS_PIN, RST_PIN);
-BLECharacteristic *events;
-BLEServer *server;
-QueueHandle_t commands;
-volatile bool connected = false;
-volatile bool disconnected = false;
-String rx;
-struct Command { char line[512]; };
+WebServer server(80);
+bool connected = false;
+String eventToken, eventJson;
+uint32_t lastContact = 0;
 enum Phase { IDLE, READING, WAIT_RESULT, COUNTDOWN, WAIT_SAVE };
 Phase phase = IDLE;
 String token, uid;
@@ -65,16 +57,9 @@ String proof(const char *action) {
   return String(hex);
 }
 void emit(JsonDocument &doc) {
-  if (!connected) return;
-  String line;
-  serializeJson(doc, line);
-  line += '\n';
-  for (size_t i = 0; i < line.length() && connected; i += 20) {
-    String part = line.substring(i, i + 20);
-    events->setValue((uint8_t *)part.c_str(), part.length());
-    events->notify();
-    delay(15); // Conservative for iOS even with the minimum ATT MTU.
-  }
+  eventToken = token;
+  eventJson = "";
+  serializeJson(doc, eventJson);
 }
 void event(const char *type, const char *action = nullptr) {
   JsonDocument doc;
@@ -98,50 +83,22 @@ void error(const char *code) {
   emit(doc);
   reset();
 }
-class ServerCallbacks : public BLEServerCallbacks {
-  void onConnect(BLEServer *) override { connected = true; }
-  void onDisconnect(BLEServer *) override {
-    connected = false;
-    disconnected = true;
-    rx = "";
-  }
-};
-class CommandCallbacks : public BLECharacteristicCallbacks {
-  void onWrite(BLECharacteristic *characteristic) override {
-    auto value = characteristic->getValue();
-    for (size_t i = 0; i < value.length(); ++i) {
-      char c = value[i];
-      if (c == '\n') {
-        Command cmd = {};
-        rx.toCharArray(cmd.line, sizeof(cmd.line));
-        xQueueSend(commands, &cmd, 0);
-        rx = "";
-      } else {
-        rx += c;
-        if (rx.length() >= 511) { rx = ""; return; }
-      }
-    }
-  }
-};
 bool validToken(const String &s) {
   if (s.length() != 64) return false;
   for (char c : s) if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) return false;
   return true;
 }
-void handleCommand(const Command &cmd) {
-  JsonDocument doc;
-  if (deserializeJson(doc, cmd.line)) return;
+void handleCommand(const JsonDocument &doc) {
   String type = doc["type"] | "";
-  String incoming = doc["token"] | "";
-  if (!validToken(incoming)) return;
   if (type == "scan" && phase == IDLE) {
-    token = incoming;
+    token = doc["token"].as<String>();
+    eventToken = "";
+    eventJson = "";
     phase = READING; phaseStarted = millis();
     rgb(false, false, true);
     Serial.println("Scan armed: present card to RC522");
     return;
   }
-  if (incoming != token) return;
   if (type == "cancel") { reset(); return; }
   if (type == "capture_saved" && phase == WAIT_SAVE) {
     Serial.println("Backend confirmed simulated capture"); reset(); return;
@@ -167,8 +124,71 @@ void checkRemoval() {
   else if (absentSince == 0) absentSince = millis();
   else if (millis() - absentSince > 600) { waitRemoval = false; absentSince = 0; }
 }
+void handleHttp(bool polling) {
+  const String body = server.arg("plain");
+  JsonDocument doc;
+  if (body.length() > 512 || deserializeJson(doc, body)) {
+    server.send(400, "text/plain", "Invalid request");
+    return;
+  }
+  String incoming = doc["token"] | "";
+  if (!validToken(incoming)) {
+    server.send(400, "text/plain", "Invalid token");
+    return;
+  }
+  if (polling) {
+    if (incoming == token) lastContact = millis();
+    if (incoming == eventToken) server.send(200, "application/json", eventJson);
+    else server.send(204);
+    return;
+  }
+  String type = doc["type"] | "";
+  if (type == "scan" && phase == IDLE) {
+    connected = true;
+  } else if (incoming != token) {
+    server.send(409, "text/plain", "Mirror busy or session expired");
+    return;
+  }
+  lastContact = millis();
+  // Reply before running LED/buzzer feedback, which may take several hundred ms.
+  server.send(204);
+  handleCommand(doc);
+}
+
+String readWifiLine() {
+  while (true) {
+    if (Serial.available()) {
+      String value = Serial.readStringUntil('\n');
+      if (value.endsWith("\r")) value.remove(value.length() - 1);
+      if (value.length()) return value;
+    }
+    delay(20);
+  }
+}
+
+void connectWifi() {
+  WiFi.persistent(false);
+  WiFi.mode(WIFI_STA);
+  WiFi.setAutoReconnect(true);
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.println("Nom du partage de connexion :");
+    const String ssid = readWifiLine();
+    Serial.println("Mot de passe Wi-Fi :");
+    const String password = readWifiLine();
+    WiFi.begin(ssid.c_str(), password.c_str());
+    uint32_t started = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - started < 25000) delay(250);
+    if (WiFi.status() != WL_CONNECTED) {
+      WiFi.disconnect();
+      Serial.println("Connexion echouee. Verifiez le partage de connexion.");
+    }
+  }
+}
+
 void setup() {
   Serial.begin(115200);
+  Serial.setTimeout(1000);
+  while (!Serial) delay(20);
   pinMode(LED_RED, OUTPUT); pinMode(LED_GREEN, OUTPUT); pinMode(LED_BLUE, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT); reset();
   // Visual self-test: verify actual red, green, blue; change pin mapping if needed.
@@ -176,48 +196,40 @@ void setup() {
   rgb(false, true, false); Serial.println("RGB test: GREEN (GPIO6)"); delay(700);
   rgb(false, false, true); Serial.println("RGB test: BLUE (GPIO4)"); delay(700);
   reset();
-  if (BLE_PAIRING_PASSKEY < 100000 || BLE_PAIRING_PASSKEY > 999999 || strlen(MIRROR_SIGNING_KEY) < 32 || String(MIRROR_SIGNING_KEY).startsWith("REPLACE_")) {
-    Serial.println("Configure MIRROR_SIGNING_KEY and a six-digit BLE_PAIRING_PASSKEY in config.h first.");
+  if (strlen(MIRROR_SIGNING_KEY) < 32 || String(MIRROR_SIGNING_KEY).startsWith("REPLACE_")) {
+    Serial.println("Configure MIRROR_SIGNING_KEY in config.h first.");
     while (true) delay(1000);
   }
   SPI.begin(SCK_PIN, MISO_PIN, MOSI_PIN, SS_PIN);
   reader.PCD_Init(); reader.PCD_DumpVersionToSerial();
-  commands = xQueueCreate(5, sizeof(Command));
-  BLEDevice::init("Fairest-One-C6");
-  auto *security = new BLESecurity();
-  security->setPassKey(true, BLE_PAIRING_PASSKEY);
-  security->setCapability(ESP_IO_CAP_OUT);
-  security->setAuthenticationMode(true, true, true);
-  security->setForceAuthentication(true);
-  server = BLEDevice::createServer(); server->setCallbacks(new ServerCallbacks());
-  auto *service = server->createService(SERVICE_UUID);
-  events = service->createCharacteristic(EVENTS_UUID, BLECharacteristic::PROPERTY_NOTIFY);
-  auto *subscription = new BLE2902();
-#if defined(CONFIG_BLUEDROID_ENABLED)
-  subscription->setAccessPermissions(ESP_GATT_PERM_READ_ENC_MITM | ESP_GATT_PERM_WRITE_ENC_MITM);
-#endif
-  events->addDescriptor(subscription);
-  auto *write = service->createCharacteristic(COMMANDS_UUID, BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_WRITE_AUTHEN);
-#if defined(CONFIG_BLUEDROID_ENABLED)
-  write->setAccessPermissions(ESP_GATT_PERM_WRITE_ENC_MITM);
-#endif
-  write->setCallbacks(new CommandCallbacks());
-  service->start();
-  auto *advertising = BLEDevice::getAdvertising();
-  advertising->addServiceUUID(SERVICE_UUID); advertising->setScanResponse(true);
-  advertising->setMinPreferred(0x06); advertising->setMaxPreferred(0x12);
-  BLEDevice::startAdvertising();
-  Serial.println("BLE ready; no Wi-Fi. USB is programming/logs only.");
+  connectWifi();
+  server.on("/mirror/status", HTTP_GET, [] {
+    server.send(200, "text/plain", "fairest-one-wifi-v1");
+  });
+  server.on("/mirror/command", HTTP_POST, [] { handleHttp(false); });
+  server.on("/mirror/event", HTTP_POST, [] { handleHttp(true); });
+  server.begin();
 }
 void loop() {
-  if (disconnected) {
-    disconnected = false; reset(); xQueueReset(commands);
-    Serial.println("BLE disconnected; countdown cancelled");
-    delay(100); BLEDevice::startAdvertising();
+  if (WiFi.status() != WL_CONNECTED || (connected && millis() - lastContact > 5500)) {
+    if (connected) {
+      reset();
+      eventToken = "";
+      eventJson = "";
+      connected = false;
+    }
   }
-  if (!connected) { delay(20); return; }
-  Command cmd;
-  while (xQueueReceive(commands, &cmd, 0) == pdTRUE) handleCommand(cmd);
+  static IPAddress lastIp;
+  if (WiFi.status() == WL_CONNECTED) {
+    if (WiFi.localIP() != lastIp) {
+      lastIp = WiFi.localIP();
+      Serial.print("Adresse du miroir : ");
+      Serial.println(lastIp);
+    }
+    server.handleClient();
+  } else {
+    lastIp = IPAddress();
+  }
   checkRemoval();
   if (phase == READING && !waitRemoval && reader.PICC_IsNewCardPresent() && reader.PICC_ReadCardSerial()) {
     uid = "";
@@ -241,6 +253,6 @@ void loop() {
   }
   if ((phase == READING && millis() - phaseStarted > 35000) ||
       (phase == WAIT_RESULT && millis() - phaseStarted > 12000) ||
-      (phase == WAIT_SAVE && millis() - phaseStarted > 25000)) error("flutter_timeout");
+      (phase == WAIT_SAVE && millis() - phaseStarted > 25000)) error("mirror_timeout");
   delay(20);
 }

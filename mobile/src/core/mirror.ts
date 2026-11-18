@@ -28,7 +28,7 @@ export class MirrorFlow extends Flow {
     });
   }
   private confirmCard(token: string, recognized: boolean, signal: AbortSignal) {
-    // A GATT write acknowledgment only confirms receipt of the command. Wait
+    // A transport acknowledgment only confirms receipt of the command. Wait
     // for the firmware to finish its LED/buzzer before closing the connection.
     return this.event('card_result_applied', token, { type: 'card_result', token, recognized, capture: false }, signal);
   }
@@ -40,7 +40,7 @@ export class MirrorFlow extends Flow {
       }
       let token: string | undefined;
       let completed = false;
-      this.publish('Connexion Bluetooth au lecteur du miroir…', 'checking');
+      this.publish('Connexion au lecteur du miroir…', 'checking');
       try {
         await this.ble.connect(signal);
         checkActive(signal);
@@ -117,7 +117,7 @@ export class MirrorFlow extends Flow {
         saved = await this.api.post(body, signal);
       }
       if (saved.state !== 'captured') throw new Error('Enregistrement de la capture non confirmé.');
-      // The backend has committed. A lost BLE acknowledgment must not turn a
+      // The backend has committed. A lost mirror acknowledgment must not turn a
       // saved capture into an error or cancel its completed request.
       completed = true;
       try { await this.ble.send({ type: 'capture_saved', token }, signal); }
@@ -139,7 +139,7 @@ export class MirrorFlow extends Flow {
   // The same transport lock also excludes registration and recovery.
   tryOn() {
     return this.run(async signal => {
-      this.publish('Connexion Bluetooth au miroir…', 'checking');
+      this.publish('Connexion au miroir…', 'checking');
       try {
         await this.ble.connect(signal);
         checkActive(signal);
@@ -149,7 +149,7 @@ export class MirrorFlow extends Flow {
   }
   start() {
     return this.run(async signal => {
-      this.publish('Connexion Bluetooth au miroir…', 'checking');
+      this.publish('Connexion au miroir…', 'checking');
       try {
         await this.ble.connect(signal);
         while (!signal.aborted) {

@@ -39,5 +39,5 @@ export function normalizeUid(value: unknown): string {
   return uid;
 }
 export function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'Lecture interrompue. Vérifiez Bluetooth et Internet puis réessayez.';
+  return error instanceof Error ? error.message : 'Lecture interrompue. Vérifiez la connexion au miroir et Internet puis réessayez.';
 }

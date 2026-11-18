@@ -14,6 +14,15 @@
         "usesNonExemptEncryption": false
       },
       "infoPlist": {
+        "NSLocalNetworkUsageDescription": "Fairest One communique avec le lecteur NFC du miroir sur votre réseau Wi-Fi.",
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true,
+          "NSExceptionDomains": {
+            "10.0.0.0/8": { "NSExceptionAllowsInsecureHTTPLoads": true },
+            "172.16.0.0/12": { "NSExceptionAllowsInsecureHTTPLoads": true },
+            "192.168.0.0/16": { "NSExceptionAllowsInsecureHTTPLoads": true }
+          }
+        },
         "NSBluetoothAlwaysUsageDescription": "Fairest One utilise le lecteur de cartes du miroir en Bluetooth pour inscrire votre carte, lancer un essayage et retrouver votre session."
       }
     },
