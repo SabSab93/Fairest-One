@@ -64,9 +64,88 @@ test('scan and capture proofs have distinct domains and reject tampering', async
   const handler = createHandler(() => ({rpc:async () => { calls++;return {data:{state:'recognized'}}; }}));
   assert.equal((await handler.fetch(request(signed('scan')))).status,200);
   assert.equal((await handler.fetch(request(signed('scan',{card_uid:'01020304'})))).status,401);
-  assert.equal((await handler.fetch(request(signed('scan',{action:'capture'})))).status,401);
-  assert.equal((await handler.fetch(request(signed('capture')))).status,200);
-  assert.equal(calls,2);
+  assert.equal((await handler.fetch(request(signed('scan',{action:'capture_status'})))).status,401);
+  assert.equal((await handler.fetch(request(signed('capture')))).status,410);
+  assert.equal(calls,1);
+});
+
+test('uploads only signed JPEG bytes and retries without creating a second photo', async () => {
+  const photo = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0xff, 0xd9]);
+  const digest = createHash('sha256').update(photo).digest('hex');
+  const hash = createHash('sha256').update(token).digest('hex');
+  const expectedPath = `captures/${hash}/${digest}.jpg`;
+  const proof = createHmac('sha256', process.env.MIRROR_SIGNING_KEY)
+    .update(`${token}|${uid}|capture_photo|${digest}`).digest('hex');
+  const photoRequest = (bytes = photo) => new Request('https://example.test/api/clients', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'image/jpeg',
+      'X-Mirror-Token': token,
+      'X-Mirror-Card': uid,
+      'X-Mirror-Photo-Sha256': digest,
+      'X-Mirror-Proof': proof,
+    },
+    body: bytes,
+  });
+  let path;
+  let uploads = 0;
+  const handler = createHandler(() => ({
+    rpc: async (name, args) => {
+      assert.equal(name, 'mirror_photo_capture');
+      assert.equal(args.p_hash, hash);
+      assert.equal(args.p_uid, uid);
+      if (args.p_storage_path) {
+        assert.equal(args.p_storage_path, expectedPath);
+        path = args.p_storage_path;
+      }
+      return {data: path ? {state: 'captured', storage_path: path} : {state: 'ready'}};
+    },
+    storage: {from: bucket => {
+      assert.equal(bucket, 'mirror-photos');
+      return {upload: async (file, bytes, options) => {
+        assert.equal(file, expectedPath);
+        assert.deepEqual(bytes, photo);
+        assert.equal(options.upsert, false);
+        uploads++;
+        return {};
+      }};
+    }},
+  }));
+  assert.equal((await handler.fetch(photoRequest(Buffer.from([0xff, 0xd8, 0xff, 0xd9])))).status, 400);
+  const first = await handler.fetch(photoRequest());
+  assert.deepEqual(await first.json(), {state: 'captured'});
+  assert.equal((await handler.fetch(photoRequest())).status, 200);
+  assert.deepEqual(await (await handler.fetch(request(signed('capture_status')))).json(), {state: 'captured'});
+  assert.equal(uploads, 1);
+});
+
+test('recovery signs real photos for the recovered session and omits old placeholders', async () => {
+  const storagePath = 'captures/opaque/image.jpg';
+  const createdAt = '2026-11-18T12:00:00Z';
+  const filters = [];
+  const query = {
+    select: () => query,
+    eq: (column, value) => { filters.push([column, value]); return query; },
+    like: (column, value) => { filters.push([column, value]); return query; },
+    order: column => column === 'id' ? {data: [{id: 'photo', storage_path: storagePath, created_at: createdAt}]} : query,
+  };
+  const url = 'https://storage.example.test/signed-photo';
+  const handler = createHandler(() => ({
+    rpc: async () => ({data: {
+      state: 'recovered', session_id: 'session', client: {email: 'client@example.test', photo_count: 2, messages: ['historical']},
+    }}),
+    from: table => { assert.equal(table, 'photos'); return query; },
+    storage: {from: () => ({createSignedUrls: async paths => {
+      assert.deepEqual(paths, [storagePath]);
+      return {data: [{path: storagePath, signedUrl: url}]};
+    }})},
+  }));
+  const response = await handler.fetch(request(signed('scan')));
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).client, {
+    email: 'client@example.test', photo_count: 1, messages: [], photos: [{id: 'photo', created_at: createdAt, url}],
+  });
+  assert.deepEqual(filters, [['session_id', 'session'], ['storage_path', 'captures/%']]);
 });
 test('bad input, invalid proof, expiration and backend failures stay explicit', async () => {
   const handler = createHandler(() => ({rpc:async () => ({data:{error:'expired',status:410}})}));

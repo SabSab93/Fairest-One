@@ -20,7 +20,7 @@ export class WifiMirror implements MirrorTransport {
   private token?: string;
   private listeners = new Set<(event: BleEvent | Error) => void>();
 
-  constructor(private readonly address: () => string, private readonly fetcher: typeof fetch = fetch) {}
+  constructor(private readonly address: () => string | Promise<string>, private readonly fetcher: typeof fetch = fetch) {}
 
   subscribe(listener: (event: BleEvent | Error) => void) {
     this.listeners.add(listener);
@@ -53,7 +53,7 @@ export class WifiMirror implements MirrorTransport {
   }
 
   async connect(signal: AbortSignal) {
-    this.base = 'http://' + mirrorAddress(this.address());
+    this.base = 'http://' + mirrorAddress(await this.address());
     if (await this.request('/mirror/status', undefined, signal) !== 'fairest-one-wifi-v1') {
       throw new Error('Le programme Wi-Fi de Fairest One est introuvable sur le miroir.');
     }

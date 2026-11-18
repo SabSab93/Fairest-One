@@ -134,7 +134,7 @@ class NfcFlowController with WidgetsBindingObserver {
         state.value = MirrorStatus.countdown;
         status.value = 'Carte reconnue · compte à rebours 3, 2, 1';
         final capture = await _wait(
-          'capture_simulated',
+          'photo_captured',
           token,
           () => ble.send({
             'type': 'card_result',
@@ -144,21 +144,19 @@ class NfcFlowController with WidgetsBindingObserver {
           }),
         );
         checkActive();
-        // Retrying the identical capture is safe: the backend persists it once.
         final body = {
-          'action': 'capture',
+          'action': 'capture_status',
           'token': token,
           'card_uid': capture['uid'],
           'proof': capture['proof'],
         };
-        try {
-          await _post(body);
-        } catch (_) {
-          await _post(body);
+        final confirmation = await _post(body);
+        if (confirmation['state'] != 'captured') {
+          throw StateError('La photo n’a pas été enregistrée.');
         }
         await ble.send({'type': 'capture_saved', 'token': token});
         state.value = MirrorStatus.photoUploaded;
-        status.value = 'Capture simulée enregistrée';
+        status.value = 'Photo enregistrée';
       } else {
         await ble.send({
           'type': 'card_result',

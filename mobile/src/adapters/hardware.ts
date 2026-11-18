@@ -11,6 +11,13 @@ function nativeBuild() {
   if (Constants.executionEnvironment === 'storeClient') throw new Error('Installez la version Fairest One construite avec EAS pour utiliser le NFC et le Bluetooth.');
 }
 const key = 'fairest_one.expo.phone_access.v1';
+const mirrorAddressKey = 'fairest_one.expo.mirror_address.v1';
+export const mirrorAddressStore = {
+  read: () => SecureStore.getItemAsync(mirrorAddressKey),
+  save: (value: string) => SecureStore.setItemAsync(mirrorAddressKey, value, {
+    keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+  }),
+};
 export const accessStore: AccessStore = {
   read: () => SecureStore.getItemAsync(key),
   save: value => SecureStore.setItemAsync(key, value, { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY }),

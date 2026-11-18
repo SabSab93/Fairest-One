@@ -1,4 +1,5 @@
-// ESP32-C6, Arduino ESP32 core 3.3.12; MFRC522 1.4.12; ArduinoJson 7.4.2.
+// ESP32-C6 or ESP32-S3-CAM N16R8 (16 MB Flash, OPI PSRAM, 2 MB app partition).
+// Arduino ESP32 core 3.3.12; MFRC522 1.4.12; ArduinoJson 7.4.2.
 // Wi-Fi mirror with autonomous try-ons and optional iPhone controls.
 #include <Arduino.h>
 #include <SPI.h>
@@ -16,6 +17,20 @@
 #define MIRROR_API_URL "https://fairest-one-documentation.vercel.app/api/clients"
 #endif
 
+#if CONFIG_IDF_TARGET_ESP32S3
+#include "camera_s3.h"
+// GPIOs 38-40 share the microSD socket. Leave it empty with this external RGB LED.
+#define LED_RED 38
+#define LED_GREEN 39
+#define LED_BLUE 40
+#define BUZZER_PIN 47
+#define SS_PIN 21
+#define RST_PIN 14
+#define SCK_PIN 42
+#define MOSI_PIN 41
+// GPIO2 drives the board's status LED. Use the free GPIO1 for the reader output.
+#define MISO_PIN 1
+#else
 #define LED_RED 5
 #define LED_GREEN 6
 #define LED_BLUE 4
@@ -25,13 +40,14 @@
 #define SCK_PIN 19
 #define MOSI_PIN 18
 #define MISO_PIN 2
+#endif
 
 MFRC522 reader(SS_PIN, RST_PIN);
 WebServer server(80);
 bool connected = false;
 String eventToken, eventJson;
 uint32_t lastContact = 0;
-enum Phase { IDLE, READING, WAIT_RESULT, COUNTDOWN, WAIT_SAVE };
+enum Phase { IDLE, READING, WAIT_RESULT, COUNTDOWN, UPLOADING, WAIT_SAVE };
 Phase phase = IDLE;
 String token, uid;
 uint32_t phaseStarted = 0, tickStarted = 0, absentSince = 0;
@@ -57,15 +73,20 @@ void beep(int count) {
     delay(100);
   }
 }
-String proof(const char *action) {
-  String data = token + "|" + uid + "|" + action;
+String hexDigest(const unsigned char *digest) {
+  char hex[65];
+  for (int i = 0; i < 32; ++i) snprintf(hex + i * 2, 3, "%02x", digest[i]);
+  return String(hex);
+}
+String signMirrorMessage(const String &data) {
   unsigned char digest[32];
   const auto *info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
   mbedtls_md_hmac(info, (const unsigned char *)MIRROR_SIGNING_KEY,
     strlen(MIRROR_SIGNING_KEY), (const unsigned char *)data.c_str(), data.length(), digest);
-  char hex[65];
-  for (int i = 0; i < 32; ++i) snprintf(hex + i * 2, 3, "%02x", digest[i]);
-  return String(hex);
+  return hexDigest(digest);
+}
+String proof(const char *action) {
+  return signMirrorMessage(token + "|" + uid + "|" + action);
 }
 void emit(JsonDocument &doc) {
   eventToken = token;
@@ -117,7 +138,7 @@ int postToApi(const char *action, JsonDocument &reply) {
   JsonDocument request;
   request["action"] = action;
   if (token.length()) request["token"] = token;
-  if (strcmp(action, "scan") == 0 || strcmp(action, "capture") == 0) {
+  if (strcmp(action, "scan") == 0) {
     request["card_uid"] = uid;
     request["proof"] = proof(action);
   }
@@ -169,23 +190,109 @@ void beginAutonomousCapture() {
   reset();
 }
 
-void saveAutonomousCapture() {
-  // Two short pulses imitate the two parts of a mechanical shutter.
-  rgb(true, true, true);
-  pulse(2600, 25);
-  delay(35);
-  pulse(1400, 65);
-  rgb(false, false, false);
-  Serial.println("Autonomous try-on: shutter simulated");
-  JsonDocument reply;
-  int status = postToApi("capture", reply);
-  // The server deduplicates retries for this token.
-  if (status < 0 || status >= 500) status = postToApi("capture", reply);
-  const bool saved = status == 200 && reply["state"] == "captured";
-  Serial.println(saved ? "Backend confirmed autonomous simulated capture" : "Autonomous capture was not confirmed");
-  rgb(!saved, saved, false);
-  delay(350);
-  reset();
+#if CONFIG_IDF_TARGET_ESP32S3
+struct PhotoJob {
+  char token[65];
+  char uid[21];
+};
+enum PhotoResult { PHOTO_SAVED, PHOTO_CAMERA_FAILED, PHOTO_UPLOAD_FAILED };
+QueueHandle_t photoJobs = nullptr;
+QueueHandle_t photoResults = nullptr;
+bool photoUploadRunning = false;
+
+int uploadPhoto(const PhotoJob &job, const String &checksum);
+int uploadPhoto(const PhotoJob &job, const String &checksum) {
+  if (WiFi.status() != WL_CONNECTED || time(nullptr) < 1735689600) return -1;
+  NetworkClientSecure client;
+  client.useBuiltinCACertBundle();
+  client.setHandshakeTimeout(5);
+  HTTPClient http;
+  http.setConnectTimeout(3500);
+  http.setTimeout(10000);
+  if (!String(MIRROR_API_URL).startsWith("https://") || !http.begin(client, MIRROR_API_URL)) return -1;
+  http.addHeader("Content-Type", "image/jpeg");
+  http.addHeader("X-Mirror-Token", job.token);
+  http.addHeader("X-Mirror-Card", job.uid);
+  http.addHeader("X-Mirror-Photo-Sha256", checksum);
+  http.addHeader("X-Mirror-Proof", signMirrorMessage(String(job.token) + "|" + job.uid + "|capture_photo|" + checksum));
+  int status = http.POST(latestPhoto->buf, latestPhoto->len);
+  if (status == 200) {
+    JsonDocument reply;
+    if (deserializeJson(reply, http.getString()) || reply["state"] != "captured") status = -1;
+  }
+  http.end();
+  return status;
+}
+
+void runPhotoJobs(void *) {
+  PhotoJob job;
+  while (xQueueReceive(photoJobs, &job, portMAX_DELAY) == pdTRUE) {
+    PhotoResult result = PHOTO_CAMERA_FAILED;
+    if (takeMirrorPhoto()) {
+      unsigned char digest[32];
+      const auto *info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+      mbedtls_md(info, latestPhoto->buf, latestPhoto->len, digest);
+      const String checksum = hexDigest(digest);
+      int status = uploadPhoto(job, checksum);
+      // A retry sends the same frame and uses the same recognition challenge.
+      if (status < 0 || status >= 500) status = uploadPhoto(job, checksum);
+      Serial.printf("Photo upload: HTTP %d\n", status);
+      result = status == 200 ? PHOTO_SAVED : PHOTO_UPLOAD_FAILED;
+    }
+    xQueueSend(photoResults, &result, portMAX_DELAY);
+  }
+  vTaskDelete(nullptr);
+}
+
+void startPhotoWorker() {
+  photoJobs = xQueueCreate(1, sizeof(PhotoJob));
+  photoResults = xQueueCreate(1, sizeof(PhotoResult));
+  if (!photoJobs || !photoResults || xTaskCreate(runPhotoJobs, "mirror-photo", 12288, nullptr, 1, nullptr) != pdPASS) {
+    if (photoJobs) vQueueDelete(photoJobs);
+    if (photoResults) vQueueDelete(photoResults);
+    photoJobs = nullptr;
+    photoResults = nullptr;
+    Serial.println("Photo worker unavailable");
+  }
+}
+
+void checkPhotoResult() {
+  PhotoResult result;
+  if (!photoUploadRunning || xQueueReceive(photoResults, &result, 0) != pdTRUE) return;
+  photoUploadRunning = false;
+  if (phase != UPLOADING) return;
+  if (result != PHOTO_SAVED) {
+    error(result == PHOTO_CAMERA_FAILED ? "camera_capture_failed" : "photo_upload_failed");
+    return;
+  }
+  if (autonomous) {
+    rgb(false, true, false);
+    delay(150);
+    reset();
+  } else {
+    phase = WAIT_SAVE;
+    phaseStarted = millis();
+    event("photo_captured", "capture_status");
+  }
+}
+#endif
+
+void startPhotoCapture() {
+#if CONFIG_IDF_TARGET_ESP32S3
+  if (photoJobs && cameraReady && !photoUploadRunning) {
+    PhotoJob job = {};
+    token.toCharArray(job.token, sizeof(job.token));
+    uid.toCharArray(job.uid, sizeof(job.uid));
+    if (xQueueSend(photoJobs, &job, 0) == pdTRUE) {
+      phase = UPLOADING;
+      photoUploadRunning = true;
+      rgb(false, false, false);
+      pulse(2600, 25);
+      return;
+    }
+  }
+#endif
+  error("camera_unavailable");
 }
 
 void handleCommand(const JsonDocument &doc) {
@@ -201,7 +308,7 @@ void handleCommand(const JsonDocument &doc) {
   }
   if (type == "cancel") { reset(); return; }
   if (type == "capture_saved" && phase == WAIT_SAVE) {
-    Serial.println("Backend confirmed simulated capture"); reset(); return;
+    Serial.println("Backend confirmed capture event"); reset(); return;
   }
   if (type != "card_result" || phase != WAIT_RESULT || !doc["recognized"].is<bool>()) return;
   if (!doc["recognized"].as<bool>()) {
@@ -215,12 +322,14 @@ void handleCommand(const JsonDocument &doc) {
   phase = COUNTDOWN; phaseStarted = millis(); tickStarted = millis(); countdown = 3;
   Serial.println("Countdown: 3");
 }
-void checkRemoval() {
-  if (!waitRemoval) return;
+bool wakePresentedCard() {
   byte atqa[2]; byte size = sizeof(atqa);
   auto status = reader.PICC_WakeupA(atqa, &size);
-  bool present = status == MFRC522::STATUS_OK || status == MFRC522::STATUS_COLLISION;
-  if (present) { absentSince = 0; reader.PICC_ReadCardSerial(); reader.PICC_HaltA(); reader.PCD_StopCrypto1(); }
+  return status == MFRC522::STATUS_OK || status == MFRC522::STATUS_COLLISION;
+}
+void checkRemoval() {
+  if (!waitRemoval) return;
+  if (wakePresentedCard()) { absentSince = 0; reader.PICC_ReadCardSerial(); reader.PICC_HaltA(); reader.PCD_StopCrypto1(); }
   else if (absentSince == 0) absentSince = millis();
   else if (millis() - absentSince > 600) { waitRemoval = false; absentSince = 0; }
 }
@@ -296,9 +405,9 @@ void setup() {
   pinMode(LED_RED, OUTPUT); pinMode(LED_GREEN, OUTPUT); pinMode(LED_BLUE, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT); reset();
   // Visual self-test: verify actual red, green, blue; change pin mapping if needed.
-  rgb(true, false, false); Serial.println("RGB test: RED (GPIO5)"); delay(700);
-  rgb(false, true, false); Serial.println("RGB test: GREEN (GPIO6)"); delay(700);
-  rgb(false, false, true); Serial.println("RGB test: BLUE (GPIO4)"); delay(700);
+  rgb(true, false, false); Serial.printf("RGB test: RED (GPIO%d)\n", LED_RED); delay(700);
+  rgb(false, true, false); Serial.printf("RGB test: GREEN (GPIO%d)\n", LED_GREEN); delay(700);
+  rgb(false, false, true); Serial.printf("RGB test: BLUE (GPIO%d)\n", LED_BLUE); delay(700);
   reset();
   if (strlen(MIRROR_SIGNING_KEY) < 32 || String(MIRROR_SIGNING_KEY).startsWith("REPLACE_")) {
     Serial.println("Configure MIRROR_SIGNING_KEY in config.h first.");
@@ -306,6 +415,10 @@ void setup() {
   }
   SPI.begin(SCK_PIN, MISO_PIN, MOSI_PIN, SS_PIN);
   reader.PCD_Init(); reader.PCD_DumpVersionToSerial();
+#if CONFIG_IDF_TARGET_ESP32S3
+  beginMirrorCamera();
+  startPhotoWorker();
+#endif
   connectWifi();
   configTime(0, 0, "time.cloudflare.com", "pool.ntp.org");
   server.on("/mirror/status", HTTP_GET, [] {
@@ -317,6 +430,10 @@ void setup() {
   Serial.println("Autonomous try-on ready: present a registered card");
 }
 void loop() {
+#if CONFIG_IDF_TARGET_ESP32S3
+  checkPhotoResult();
+  if (phase == IDLE && !photoUploadRunning && Serial.read() == 'j') exportMirrorPhoto();
+#endif
   if (WiFi.status() != WL_CONNECTED || (connected && millis() - lastContact > 5500)) {
     if (connected) {
       reset();
@@ -336,16 +453,20 @@ void loop() {
   } else {
     lastIp = IPAddress();
   }
-  checkRemoval();
-  const bool readyForCard = phase == READING || (phase == IDLE && WiFi.status() == WL_CONNECTED);
-  if (readyForCard && !waitRemoval && reader.PICC_IsNewCardPresent() && reader.PICC_ReadCardSerial()) {
+  const bool readingFromApp = phase == READING;
+  if (!readingFromApp) checkRemoval();
+  // An explicit app read can wake a card still on the reader after an essayage.
+  // Autonomous essayages still require removal before triggering another capture.
+  const bool cardPresent = readingFromApp ? wakePresentedCard() :
+    phase == IDLE && WiFi.status() == WL_CONNECTED && !waitRemoval && reader.PICC_IsNewCardPresent();
+  if (cardPresent && reader.PICC_ReadCardSerial()) {
     uid = "";
     for (byte i = 0; i < reader.uid.size; i++) {
       char hex[3]; snprintf(hex, sizeof(hex), "%02X", reader.uid.uidByte[i]); uid += hex;
     }
     reader.PICC_HaltA(); reader.PCD_StopCrypto1();
     waitRemoval = true; absentSince = 0;
-    if (phase == READING) {
+    if (readingFromApp) {
       phase = WAIT_RESULT; phaseStarted = millis();
       Serial.println("NFC read; waiting for app/backend confirmation");
       event("card_scanned", "scan");
@@ -358,13 +479,9 @@ void loop() {
     tickStarted = millis(); countdown--;
     if (autonomous) {
       if (countdown > 0) countdownSignal();
-      else saveAutonomousCapture();
+      else startPhotoCapture();
     } else if (countdown > 0) Serial.printf("Countdown: %d\n", countdown);
-    else {
-      phase = WAIT_SAVE; phaseStarted = millis();
-      Serial.println("Simulated capture; waiting for backend save");
-      event("capture_simulated", "capture");
-    }
+    else startPhotoCapture();
   }
   if ((phase == READING && millis() - phaseStarted > 35000) ||
       (phase == WAIT_RESULT && millis() - phaseStarted > 12000) ||

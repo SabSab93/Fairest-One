@@ -114,7 +114,7 @@ export default function Admin() {
             <Copy>Carte : {client.card_uid ?? 'Non associée'}</Copy>
             <Copy>{new Date(client.created_at).toLocaleDateString('fr-FR')}</Copy>
           </>}
-          <Copy>{client.photo_count} capture(s) simulée(s)</Copy>
+          <Copy>{client.photo_count} photo(s)</Copy>
           {tab === 'clients' && !!client.card_uid && (selectedId === client.id ?
             <View style={[s.card, { backgroundColor: colors.dustyRose }]}>
               <Copy accessibilityRole="header" style={{ fontWeight: '600' }}>Réinitialiser la carte</Copy>

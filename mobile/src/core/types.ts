@@ -1,4 +1,9 @@
 export type Purpose = 'registration' | 'recovery';
+export interface SessionPhoto {
+  id: string;
+  created_at: string;
+  url: string;
+}
 export interface ClientRecord {
   id: string;
   email: string;
@@ -6,6 +11,7 @@ export interface ClientRecord {
   created_at: string;
   photo_count: number;
   messages: string[];
+  photos?: SessionPhoto[];
 }
 export interface FlowResult {
   state: string;
