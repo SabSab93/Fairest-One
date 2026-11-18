@@ -149,10 +149,11 @@ void handleCommand(const Command &cmd) {
   if (type != "card_result" || phase != WAIT_RESULT || !doc["recognized"].is<bool>()) return;
   if (!doc["recognized"].as<bool>()) {
     Serial.println("Rejected: no countdown or capture");
-    rgb(true, false, false); beep(3); reset(); return;
+    rgb(true, false, false); beep(3);
+    event("card_result_applied"); reset(); return;
   }
   rgb(false, true, false); beep(2);
-  if (!(doc["capture"] | false)) { reset(); return; }
+  if (!(doc["capture"] | false)) { event("card_result_applied"); reset(); return; }
   if (!connected) { reset(); return; }
   phase = COUNTDOWN; phaseStarted = millis(); tickStarted = millis(); countdown = 3;
   Serial.println("Countdown: 3");
@@ -226,7 +227,7 @@ void loop() {
     reader.PICC_HaltA(); reader.PCD_StopCrypto1();
     waitRemoval = true; absentSince = 0;
     phase = WAIT_RESULT; phaseStarted = millis();
-    Serial.println("NFC read; waiting for Flutter/backend confirmation");
+    Serial.println("NFC read; waiting for app/backend confirmation");
     event("card_scanned", "scan");
   }
   if (phase == COUNTDOWN && millis() - tickStarted >= 1000) {

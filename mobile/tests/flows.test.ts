@@ -69,7 +69,12 @@ class Ble implements MirrorTransport {
   disconnected = false;
   onSend?: (c: Record<string, unknown>) => void;
   async connect() {}
-  async send(c: Record<string, unknown>) { this.sent.push(c); this.onSend?.(c); }
+  async send(c: Record<string, unknown>) {
+    this.sent.push(c); this.onSend?.(c);
+    if (c.type === 'card_result' && c.capture === false) {
+      this.listener?.({ type: 'card_result_applied', token: String(c.token) });
+    }
+  }
   subscribe(l: (event: BleEvent | Error) => void) { this.listener = l; return () => { this.listener = undefined; }; }
   async disconnect() { this.disconnected = true; }
 }
@@ -222,4 +227,144 @@ test('iOS miroir : perte de l’accusé BLE après association, succès backend 
   assert.equal((await flow.read('registration', 'a@example.fr')).state, 'associated');
   assert.equal(flow.getSnapshot().stage, 'saved');
   assert(!ble.sent.some(c => c.capture === true));
+});
+
+test('iPhone : attendre les LED et bips du firmware avant de déconnecter', async () => {
+  for (const registration of [true, false]) {
+    const ble = new Ble();
+    let commandReceived!: () => void;
+    const ready = new Promise<void>(resolve => { commandReceived = resolve; });
+    ble.send = async c => {
+      ble.sent.push(c);
+      if (c.type === 'scan') ble.listener?.({ type: 'card_scanned', token, uid, proof });
+      if (c.type === 'card_result') commandReceived();
+    };
+    const flow = new MirrorFlow(mockApi(body => String(body.action).startsWith('begin_')
+      ? { state: 'pending', token }
+      : { state: registration ? 'associated' : 'unknown' }), ble);
+    const pending = registration ? flow.read('registration', 'a@example.fr') : flow.tryOn();
+    await ready;
+    assert.equal(ble.disconnected, false);
+    assert.equal(flow.getSnapshot().busy, true);
+    ble.listener?.({ type: 'card_result_applied', token: 'd'.repeat(64) });
+    assert.equal(ble.disconnected, false);
+    ble.listener?.({ type: 'card_result_applied', token });
+    await pending;
+    assert(ble.disconnected);
+  }
+});
+
+test('iPhone : un bouton déclenche un seul essayage et libère le lecteur', async () => {
+  const ble = new Ble(), calls: Record<string, unknown>[] = [];
+  ble.onSend = c => {
+    if (c.type === 'scan') ble.listener?.({ type: 'card_scanned', token, uid, proof });
+    if (c.type === 'card_result' && c.capture === true) ble.listener?.({ type: 'capture_simulated', token, uid, proof });
+  };
+  const flow = new MirrorFlow(mockApi(body => {
+    calls.push(body);
+    if (body.action === 'begin_recognition') return { state: 'pending', token };
+    return { state: body.action === 'scan' ? 'recognized' : 'captured' };
+  }), ble);
+  assert.equal((await flow.tryOn()).state, 'captured');
+  assert.equal(calls.filter(c => c.action === 'begin_recognition').length, 1);
+  assert.equal(calls.filter(c => c.action === 'capture').length, 1);
+  assert.equal(flow.getSnapshot().busy, false);
+  assert.equal(flow.getSnapshot().stage, 'saved');
+  assert(ble.disconnected);
+  await flow.tryOn();
+  assert.equal(calls.filter(c => c.action === 'capture').length, 2);
+});
+
+test('iPhone : une carte inconnue termine l’essayage sans capture', async () => {
+  const ble = new Ble(), calls: Record<string, unknown>[] = [];
+  ble.onSend = c => { if (c.type === 'scan') ble.listener?.({ type: 'card_scanned', token, uid, proof }); };
+  const flow = new MirrorFlow(mockApi(body => {
+    calls.push(body);
+    return body.action === 'begin_recognition' ? { state: 'pending', token } : { state: 'unknown' };
+  }), ble);
+  assert.equal((await flow.tryOn()).state, 'unknown');
+  assert.equal(flow.getSnapshot().stage, 'error');
+  assert(!calls.some(c => c.action === 'capture'));
+  assert(!ble.sent.some(c => c.capture === true));
+  assert(ble.disconnected);
+});
+
+test('iPhone : capture sauvegardée puis accusé BLE perdu, succès conservé sans annulation', async () => {
+  // Both the guided iPhone flow and the existing continuous mode must stop
+  // cleanly without creating another challenge after the connection is lost.
+  for (const continuous of [false, true]) {
+    const ble = new Ble(), calls: Record<string, unknown>[] = [];
+    ble.send = async c => {
+      ble.sent.push(c);
+      if (c.type === 'scan') ble.listener?.({ type: 'card_scanned', token, uid, proof });
+      if (c.type === 'card_result') ble.listener?.({ type: 'capture_simulated', token, uid, proof });
+      if (c.type === 'capture_saved') throw new Error('Déconnexion');
+    };
+    const flow = new MirrorFlow(mockApi(body => {
+      calls.push(body);
+      if (body.action === 'begin_recognition') return { state: 'pending', token };
+      return { state: body.action === 'scan' ? 'recognized' : 'captured' };
+    }), ble);
+    if (continuous) await flow.start();
+    else assert.equal((await flow.tryOn()).state, 'captured');
+    assert.equal(flow.getSnapshot().stage, 'saved');
+    assert.match(flow.getSnapshot().message, /enregistrée.*interrompue/);
+    assert.equal(calls.filter(c => c.action === 'capture').length, 1);
+    assert.equal(calls.filter(c => c.action === 'begin_recognition').length, 1);
+    assert(!calls.some(c => c.action === 'cancel'));
+    assert(!ble.sent.some(c => c.type === 'cancel'));
+    assert(ble.disconnected);
+  }
+});
+
+test('iPhone : annuler le compte à rebours interdit la sauvegarde et libère le lecteur', async () => {
+  const ble = new Ble(), calls: Record<string, unknown>[] = [];
+  let flow: MirrorFlow;
+  ble.onSend = c => {
+    if (c.type === 'scan') ble.listener?.({ type: 'card_scanned', token, uid, proof });
+    if (c.type === 'card_result' && c.capture === true) flow.stop();
+  };
+  flow = new MirrorFlow(mockApi(body => {
+    calls.push(body);
+    if (body.action === 'begin_recognition') return { state: 'pending', token };
+    return { state: body.action === 'scan' ? 'recognized' : 'cancelled' };
+  }), ble);
+  await assert.rejects(flow.tryOn(), Cancelled);
+  assert(!calls.some(c => c.action === 'capture'));
+  assert(ble.sent.some(c => c.type === 'cancel'));
+  assert.equal(flow.getSnapshot().busy, false);
+  assert(ble.disconnected);
+});
+
+test('iPhone : inscription, essayages successifs puis récupération utilisent la même carte', async () => {
+  const ble = new Ble();
+  let registered = false, purpose = '', captures = 0;
+  ble.onSend = c => {
+    if (c.type === 'scan') ble.listener?.({ type: 'card_scanned', token, uid, proof });
+    if (c.type === 'card_result' && c.capture === true) ble.listener?.({ type: 'capture_simulated', token, uid, proof });
+  };
+  const flow = new MirrorFlow(mockApi(body => {
+    if (String(body.action).startsWith('begin_')) {
+      purpose = String(body.action);
+      if (purpose === 'begin_registration') assert.equal(body.email, 'a@example.fr');
+      return { state: 'pending', token };
+    }
+    assert.equal(body.card_uid, uid);
+    assert.equal(body.proof, proof);
+    if (body.action === 'capture') { captures++; return { state: 'captured' }; }
+    if (purpose === 'begin_registration') { registered = true; return { state: 'associated' }; }
+    assert(registered);
+    return purpose === 'begin_recovery'
+      ? { state: 'recovered', client: { ...client, photo_count: captures, messages: Array.from({ length: captures }, (_, i) => `Photo simulée n°${i + 1}`) } }
+      : { state: 'recognized' };
+  }), ble);
+  await flow.read('registration', ' A@EXAMPLE.FR ');
+  assert.equal(captures, 0);
+  for (let i = 0; i < 3; i++) await flow.tryOn();
+  const recovered = await flow.read('recovery');
+  assert.equal(recovered.client?.photo_count, 3);
+  assert.equal(recovered.client?.messages.length, 3);
+  assert.equal(captures, 3);
+  assert.equal(ble.sent.filter(c => c.capture === true).length, 3);
+  assert.equal(ble.sent.filter(c => c.capture === false).length, 2);
 });
