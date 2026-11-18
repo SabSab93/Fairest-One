@@ -1,13 +1,20 @@
 // ESP32-C6, Arduino ESP32 core 3.3.12; MFRC522 1.4.12; ArduinoJson 7.4.2.
-// Wi-Fi transport for the iPhone mirror. The Supabase key stays on the backend.
+// Wi-Fi mirror with autonomous try-ons and optional iPhone controls.
 #include <Arduino.h>
 #include <SPI.h>
 #include <MFRC522.h>
 #include <WiFi.h>
+#include <NetworkClientSecure.h>
+#include <HTTPClient.h>
 #include <WebServer.h>
 #include <ArduinoJson.h>
 #include <mbedtls/md.h>
+#include <time.h>
 #include "config.h"
+
+#ifndef MIRROR_API_URL
+#define MIRROR_API_URL "https://fairest-one-documentation.vercel.app/api/clients"
+#endif
 
 #define LED_RED 5
 #define LED_GREEN 6
@@ -30,19 +37,23 @@ String token, uid;
 uint32_t phaseStarted = 0, tickStarted = 0, absentSince = 0;
 int countdown = 3;
 bool waitRemoval = false;
+bool autonomous = false;
 
 void rgb(bool red, bool green, bool blue) {
   digitalWrite(LED_RED, RGB_COMMON_ANODE ? !red : red);
   digitalWrite(LED_GREEN, RGB_COMMON_ANODE ? !green : green);
   digitalWrite(LED_BLUE, RGB_COMMON_ANODE ? !blue : blue);
 }
+void pulse(uint16_t frequency, uint16_t duration) {
+  if (BUZZER_ACTIVE) digitalWrite(BUZZER_PIN, HIGH);
+  else tone(BUZZER_PIN, frequency);
+  delay(duration);
+  if (BUZZER_ACTIVE) digitalWrite(BUZZER_PIN, LOW);
+  else noTone(BUZZER_PIN);
+}
 void beep(int count) {
   for (int i = 0; i < count && connected; ++i) {
-    if (BUZZER_ACTIVE) digitalWrite(BUZZER_PIN, HIGH);
-    else tone(BUZZER_PIN, 2000);
-    delay(90);
-    if (BUZZER_ACTIVE) digitalWrite(BUZZER_PIN, LOW);
-    else noTone(BUZZER_PIN);
+    pulse(2000, 90);
     delay(100);
   }
 }
@@ -70,6 +81,7 @@ void event(const char *type, const char *action = nullptr) {
 }
 void reset() {
   phase = IDLE;
+  autonomous = false;
   token = "";
   uid = "";
   rgb(false, false, false);
@@ -88,6 +100,94 @@ bool validToken(const String &s) {
   for (char c : s) if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) return false;
   return true;
 }
+
+int postToApi(const char *action, JsonDocument &reply) {
+  if (WiFi.status() != WL_CONNECTED || time(nullptr) < 1735689600) {
+    Serial.println("API unavailable: Wi-Fi or clock not ready");
+    return -1;
+  }
+  NetworkClientSecure client;
+  client.useBuiltinCACertBundle();
+  client.setHandshakeTimeout(5);
+  HTTPClient http;
+  http.setConnectTimeout(3500);
+  http.setTimeout(5000);
+  if (!String(MIRROR_API_URL).startsWith("https://") || !http.begin(client, MIRROR_API_URL)) return -1;
+  http.addHeader("Content-Type", "application/json");
+  JsonDocument request;
+  request["action"] = action;
+  if (token.length()) request["token"] = token;
+  if (strcmp(action, "scan") == 0 || strcmp(action, "capture") == 0) {
+    request["card_uid"] = uid;
+    request["proof"] = proof(action);
+  }
+  String body;
+  serializeJson(request, body);
+  reply.clear();
+  int status = http.POST(body);
+  if (status == 200 && deserializeJson(reply, http.getString())) status = -1;
+  http.end();
+  if (status != 200) Serial.printf("Mirror API %s: %d\n", action, status);
+  return status;
+}
+
+void countdownSignal() {
+  Serial.printf("Countdown: %d\n", countdown);
+  rgb(false, false, true);
+  pulse(2000, 75);
+}
+
+void beginAutonomousCapture() {
+  connected = false;
+  autonomous = true;
+  rgb(false, false, true);
+  JsonDocument reply;
+  if (postToApi("begin_recognition", reply) == 200) {
+    token = reply["token"].as<String>();
+    if (validToken(token) && postToApi("scan", reply) == 200) {
+      String state = reply["state"] | "";
+      if (state == "recognized") {
+        phase = COUNTDOWN;
+        tickStarted = millis();
+        countdown = 3;
+        countdownSignal();
+        return;
+      }
+      if (state == "unknown") {
+        Serial.println("Autonomous try-on: unregistered card");
+        rgb(true, false, false);
+        pulse(900, 200);
+        reset();
+        return;
+      }
+    }
+    if (validToken(token)) postToApi("cancel", reply);
+  }
+  Serial.println("Autonomous try-on: card verification failed");
+  rgb(true, false, false);
+  pulse(900, 350);
+  reset();
+}
+
+void saveAutonomousCapture() {
+  // Two short pulses imitate the two parts of a mechanical shutter.
+  rgb(true, true, true);
+  pulse(2600, 25);
+  delay(35);
+  pulse(1400, 65);
+  rgb(false, false, false);
+  Serial.println("Autonomous try-on: shutter simulated");
+  JsonDocument reply;
+  int status = postToApi("capture", reply);
+  // The server deduplicates retries for this token.
+  if (status < 0 || status >= 500) status = postToApi("capture", reply);
+  const bool saved = status == 200 && reply["state"] == "captured";
+  Serial.println(saved ? "Backend confirmed autonomous simulated capture" : "Autonomous capture was not confirmed");
+  rgb(!saved, saved, false);
+  delay(350);
+  reset();
+}
+
 void handleCommand(const JsonDocument &doc) {
   String type = doc["type"] | "";
   if (type == "scan" && phase == IDLE) {
@@ -125,6 +225,10 @@ void checkRemoval() {
   else if (millis() - absentSince > 600) { waitRemoval = false; absentSince = 0; }
 }
 void handleHttp(bool polling) {
+  if (autonomous) {
+    server.send(409, "text/plain", "Autonomous try-on in progress");
+    return;
+  }
   const String body = server.arg("plain");
   JsonDocument doc;
   if (body.length() > 512 || deserializeJson(doc, body)) {
@@ -203,12 +307,14 @@ void setup() {
   SPI.begin(SCK_PIN, MISO_PIN, MOSI_PIN, SS_PIN);
   reader.PCD_Init(); reader.PCD_DumpVersionToSerial();
   connectWifi();
+  configTime(0, 0, "time.cloudflare.com", "pool.ntp.org");
   server.on("/mirror/status", HTTP_GET, [] {
     server.send(200, "text/plain", "fairest-one-wifi-v1");
   });
   server.on("/mirror/command", HTTP_POST, [] { handleHttp(false); });
   server.on("/mirror/event", HTTP_POST, [] { handleHttp(true); });
   server.begin();
+  Serial.println("Autonomous try-on ready: present a registered card");
 }
 void loop() {
   if (WiFi.status() != WL_CONNECTED || (connected && millis() - lastContact > 5500)) {
@@ -231,20 +337,29 @@ void loop() {
     lastIp = IPAddress();
   }
   checkRemoval();
-  if (phase == READING && !waitRemoval && reader.PICC_IsNewCardPresent() && reader.PICC_ReadCardSerial()) {
+  const bool readyForCard = phase == READING || (phase == IDLE && WiFi.status() == WL_CONNECTED);
+  if (readyForCard && !waitRemoval && reader.PICC_IsNewCardPresent() && reader.PICC_ReadCardSerial()) {
     uid = "";
     for (byte i = 0; i < reader.uid.size; i++) {
       char hex[3]; snprintf(hex, sizeof(hex), "%02X", reader.uid.uidByte[i]); uid += hex;
     }
     reader.PICC_HaltA(); reader.PCD_StopCrypto1();
     waitRemoval = true; absentSince = 0;
-    phase = WAIT_RESULT; phaseStarted = millis();
-    Serial.println("NFC read; waiting for app/backend confirmation");
-    event("card_scanned", "scan");
+    if (phase == READING) {
+      phase = WAIT_RESULT; phaseStarted = millis();
+      Serial.println("NFC read; waiting for app/backend confirmation");
+      event("card_scanned", "scan");
+    } else {
+      beginAutonomousCapture();
+    }
   }
+  if (autonomous && phase == COUNTDOWN && millis() - tickStarted >= 200) rgb(false, false, false);
   if (phase == COUNTDOWN && millis() - tickStarted >= 1000) {
     tickStarted = millis(); countdown--;
-    if (countdown > 0) Serial.printf("Countdown: %d\n", countdown);
+    if (autonomous) {
+      if (countdown > 0) countdownSignal();
+      else saveAutonomousCapture();
+    } else if (countdown > 0) Serial.printf("Countdown: %d\n", countdown);
     else {
       phase = WAIT_SAVE; phaseStarted = millis();
       Serial.println("Simulated capture; waiting for backend save");
