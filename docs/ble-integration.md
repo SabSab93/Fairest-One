@@ -77,6 +77,8 @@ La preuve est `HMAC-SHA256(MIRROR_SIGNING_KEY, token + "|" + UID_MAJUSCULE + "|s
 
 `capture:true` est réservé à l'essayage reconnu. Pour association/récupération réussie : `recognized:true,capture:false`. Carte inconnue : `recognized:false,capture:false`. Sans confirmation valide et corrélée, aucune capture. Une erreur backend provoque une annulation, jamais un feu vert.
 
+Pour une réponse sans capture, le firmware termine les LED/bips puis émet `{"type":"card_result_applied","token":"<défi>"}` avant de revenir à l’état de repos. Le parcours Expo iPhone attend cet événement avant de déconnecter le miroir : l’accusé d’écriture GATT seul ne prouve pas que le signal physique est terminé. Le firmware de cette version doit être téléversé avec l’application mise à jour.
+
 5. Pour l'essayage reconnu : LED verte, deux bips, compte à rebours série 3/2/1 puis :
 
 ```json

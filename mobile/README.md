@@ -7,12 +7,16 @@ Les écrans, le logo, l’API Vercel, Supabase et le firmware existants sont ré
 ## Utilisation sur iPhone
 
 1. **Nouveau client** : saisir l’e-mail, appuyer sur « Associer ma carte avec le miroir », autoriser Bluetooth puis présenter la carte au RC522. L’application associe l’e-mail et la carte via le backend et affiche la confirmation. Cette opération ne déclenche aucune capture.
-2. **Essayage** : depuis l’accueil, appuyer sur « Connecter le miroir » et présenter la carte au RC522. Le backend doit reconnaître la carte avant le feu vert, les deux bips et le compte à rebours. Le message de capture simulée est ensuite enregistré. Garder cet écran ouvert.
+2. **Essayage** : après l’inscription ou depuis l’accueil, appuyer sur « Essayer mes lunettes ». Sur cet écran, appuyer sur « Lancer un essayage », attendre la demande puis présenter la carte au RC522. Le backend doit reconnaître la carte avant le feu vert, les deux bips et le compte à rebours. Le message de capture simulée est ensuite enregistré. Un appui autorise un seul essayage ; retirer la carte au moins une seconde avant de relancer pour une autre monture. Garder cet écran ouvert.
 3. **Récupération** : ouvrir « Récupérer ma session », appuyer sur « Lire ma carte sur le miroir » et présenter la carte au même RC522. Les messages de la session apparaissent sur l’iPhone. Cette opération ne déclenche aucune capture.
 
 Retirer la carte au moins 600 ms entre deux passages. Le lecteur n’est armé que pendant une demande de l’application. Une seule opération utilise le miroir à la fois. Quitter l’écran ou mettre l’app en arrière-plan annule l’opération ; une déconnexion demande une nouvelle tentative.
 
 Les captures sont encore **simulées** : aucune vraie photo ni envoi d’e-mail n’est implémenté. L’administration reprend la liste des clients, les compteurs et les informations de logs du projet existant.
+
+L’identifiant de la carte est associé à l’e-mail dans la base de données : aucune information n’est écrite sur la carte. Sur iPhone, aucune lecture NFC du téléphone n’est utilisée.
+
+L’application attend la confirmation `card_result_applied` du firmware avant de fermer une lecture sans capture. Cela laisse aux LED et aux bips le temps de se terminer. **Téléverser le firmware de cette version avant le test iPhone**, même si un ancien programme complet est déjà installé.
 
 ## Installer localement avec Xcode
 
@@ -25,14 +29,14 @@ Un compte Apple gratuit permet de signer localement cette version BLE sur son pr
 3. Sur le Mac :
 
 ```sh
-cd /Users/sabrina/dev/annee5/Fairest-One/mobile
+cd "<dossier-du-projet>/mobile"
 export PATH="/opt/homebrew/opt/node@24/bin:/opt/homebrew/bin:$PATH"
 npm ci
-cp .env.local.example .env.local
+# Seulement si .env.local n’existe pas déjà :
+test -f .env.local || cp .env.local.example .env.local
 # Renseigner EXPO_PUBLIC_API_URL dans .env.local.
 # URL actuellement approuvée : https://fairest-one-documentation.vercel.app/api/
-npx expo prebuild --platform ios --clean
-npx expo run:ios --device --configuration Release
+npm run ios:device
 ```
 
 La version **Release** embarque le JavaScript : après installation, le Mac et Metro ne sont pas nécessaires pendant l’utilisation. Pour le développement avec rechargement rapide, utiliser `npx expo run:ios --device`, puis `npm start` avec l’iPhone sur le même réseau que le Mac.
@@ -87,7 +91,7 @@ Le `.easignore` à la racine autorise les seules sources/configurations/assets n
 
 TypeScript, lint, 22 tests de flux/transports passent, dont inscription et récupération via miroir, preuve absente, mauvais défi, refus backend, carte inconnue, annulation et exclusion des opérations simultanées. L’export iOS passe. La génération iOS produit un fichier d’entitlements sans autorisation NFC.
 
-La compilation native iOS Release sans signature a réussi, avec un bundle JavaScript embarqué. La signature et l’installation attendent l’activation du mode développeur sur l’iPhone connecté. Les tests BLE sur le matériel réel restent à effectuer ; ne pas déduire leur résultat des tests logiciels. Un contrôle sans écriture de l’API active a reçu HTTP 503 « Configuration serveur incomplète » : vérifier les variables et l’environnement Vercel du domaine réellement utilisé avant les enregistrements.
+La compilation native iOS Release sans signature de la version précédente a réussi, avec un bundle JavaScript embarqué. Pour le parcours guidé actuel, les tests TypeScript/flux, le lint et l’export JavaScript iOS sont vérifiés séparément ; ils ne prouvent pas une installation signée ni un résultat matériel. La signature, l’installation sur l’iPhone et les tests BLE restent à valider. Le dernier contrôle documenté de l’API active avait reçu HTTP 503 « Configuration serveur incomplète » : son état actuel reste à vérifier avant les enregistrements.
 
 Les alertes npm de dépendances Expo/Router et d’outils restent à réévaluer avant diffusion publique. Ne pas appliquer `npm audit fix --force`, qui propose des changements de SDK incompatibles.
 
@@ -95,12 +99,14 @@ Les alertes npm de dépendances Expo/Router et d’outils restent à réévaluer
 |---|---|
 | Inscrire carte A + e-mail via RC522 | Un client associé, sans capture |
 | Réinscrire carte A / e-mail existant | Refus de doublon |
-| Essayage avec carte A | Vert, 2 bips, compte à rebours et un message |
+| « Lancer un essayage » avec carte A | Vert, 2 bips, compte à rebours et un seul message |
+| Relancer avec carte A après retrait, pour 3 essayages | Trois messages au total, aucun réarmement automatique |
 | Essayage avec carte B inconnue | Rouge, 3 bips, aucun message supplémentaire |
 | Récupérer carte A via RC522 | Messages de la session sur l’iPhone, sans capture |
 | Maintenir carte A devant RC522 | Pas de doublons jusqu’au retrait |
 | Couper Bluetooth / quitter l’écran / arrière-plan | Annulation, sans capture non autorisée |
 | Erreur backend / preuve invalide | Erreur affichée, aucun feu vert pour une capture |
+| Coupure BLE après sauvegarde confirmée | Capture annoncée comme enregistrée, sans nouvelle tentative automatique |
 
 Commandes : `npm run typecheck`, `npm run lint`, `npm test`. Les tests de l’API existante se lancent avec `npm run test:api` depuis la racine.
 

@@ -27,6 +27,11 @@ export class MirrorFlow extends Flow {
       else void this.ble.send(command, signal).catch(error => finish(undefined, error));
     });
   }
+  private confirmCard(token: string, recognized: boolean, signal: AbortSignal) {
+    // A GATT write acknowledgment only confirms receipt of the command. Wait
+    // for the firmware to finish its LED/buzzer before closing the connection.
+    return this.event('card_result_applied', token, { type: 'card_result', token, recognized, capture: false }, signal);
+  }
   read(purpose: Purpose, email?: string) {
     return this.run(async signal => {
       const normalizedEmail = email?.trim().toLowerCase();
@@ -50,7 +55,8 @@ export class MirrorFlow extends Flow {
         const result = await this.api.post({ action: 'scan', token, card_uid: uid, proof: scan.proof }, signal);
         checkActive(signal);
         if (result.state === 'failed' || result.state === 'unknown') {
-          await this.ble.send({ type: 'card_result', token, recognized: false, capture: false }, signal);
+          try { await this.confirmCard(token, false, signal); }
+          catch { checkActive(signal); }
           completed = true;
           if (result.state === 'unknown') throw new Error('Cette carte n’est pas enregistrée.');
           throw new Error(result.code === 'email_already_exists' ? 'Cette adresse e-mail est déjà enregistrée.' : 'Cette carte est déjà associée à un client.');
@@ -60,7 +66,7 @@ export class MirrorFlow extends Flow {
         // The backend has committed. Losing the LED/buzzer acknowledgment must
         // not report a failed registration or encourage creating another client.
         completed = true;
-        try { await this.ble.send({ type: 'card_result', token, recognized: true, capture: false }, signal); }
+        try { await this.confirmCard(token, true, signal); }
         catch {
           checkActive(signal);
           this.publish(purpose === 'registration' ? 'Carte enregistrée ; connexion au miroir interrompue.' : 'Session récupérée ; connexion au miroir interrompue.', 'saved');
@@ -92,10 +98,11 @@ export class MirrorFlow extends Flow {
       const result = await this.api.post({ action: 'scan', token, card_uid: uid, proof: scan.proof }, signal);
       checkActive(signal);
       if (result.state === 'unknown') {
-        await this.ble.send({ type: 'card_result', token, recognized: false, capture: false }, signal);
+        try { await this.confirmCard(token, false, signal); }
+        catch { checkActive(signal); }
         completed = true;
         this.publish('Carte inconnue · aucune capture enregistrée.', 'error');
-        return;
+        return { state: 'unknown', uid };
       }
       if (result.state !== 'recognized') throw new Error('Le service n’a pas autorisé la capture.');
       this.publish('Carte reconnue · compte à rebours 3, 2, 1', 'countdown');
@@ -110,9 +117,17 @@ export class MirrorFlow extends Flow {
         saved = await this.api.post(body, signal);
       }
       if (saved.state !== 'captured') throw new Error('Enregistrement de la capture non confirmé.');
-      await this.ble.send({ type: 'capture_saved', token }, signal);
+      // The backend has committed. A lost BLE acknowledgment must not turn a
+      // saved capture into an error or cancel its completed request.
       completed = true;
+      try { await this.ble.send({ type: 'capture_saved', token }, signal); }
+      catch {
+        checkActive(signal);
+        this.publish('Capture simulée enregistrée ; connexion au miroir interrompue.', 'saved');
+        return { state: 'captured', uid, code: 'mirror_disconnected_after_save' };
+      }
       this.publish('Capture simulée enregistrée', 'saved');
+      return { state: 'captured', uid };
     } finally {
       if (!completed && token) {
         void this.ble.send({ type: 'cancel', token }).catch(() => {});
@@ -120,12 +135,28 @@ export class MirrorFlow extends Flow {
       }
     }
   }
+  // One deliberate try-on per button press for the guided iPhone flow.
+  // The same transport lock also excludes registration and recovery.
+  tryOn() {
+    return this.run(async signal => {
+      this.publish('Connexion Bluetooth au miroir…', 'checking');
+      try {
+        await this.ble.connect(signal);
+        checkActive(signal);
+        return await this.capture(signal);
+      } finally { await this.ble.disconnect(); }
+    });
+  }
   start() {
     return this.run(async signal => {
       this.publish('Connexion Bluetooth au miroir…', 'checking');
       try {
         await this.ble.connect(signal);
-        while (!signal.aborted) { await this.capture(signal); await delay(2000, signal); }
+        while (!signal.aborted) {
+          const result = await this.capture(signal);
+          if (result.code === 'mirror_disconnected_after_save') break;
+          await delay(2000, signal);
+        }
       } finally { await this.ble.disconnect(); }
     });
   }
