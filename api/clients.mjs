@@ -84,6 +84,24 @@ async function findClientByCard(cardUid, supabase) {
   return json(normalizeClient(data));
 }
 
+async function resetCard(body, supabase) {
+  const {client_id: clientId, card_uid: cardUid} = body;
+  if (typeof clientId !== 'string' || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(clientId) ||
+      typeof cardUid !== 'string' || !cardUid.trim() || cardUid.length > 128) {
+    return json({error: 'Client ou carte invalide.'}, 400);
+  }
+
+  // The foreign keys delete the client's sessions and their captures atomically.
+  const {data, error} = await supabase.from('clients').delete()
+    .eq('id', clientId).eq('card_uid', cardUid).select('id').maybeSingle();
+  if (error) {
+    console.error('Unable to reset card:', error.code);
+    return json({error: 'Impossible de réinitialiser cette carte.'}, 502);
+  }
+  if (!data) return json({error: 'Cette carte n’est plus associée à ce client.'}, 404);
+  return json({reset: true});
+}
+
 async function createClientRecord(request, supabase) {
   let body;
   try {
@@ -213,14 +231,15 @@ export function createHandler(supabaseFactory = getSupabaseAdmin) {
       catch { return json({error: 'Corps JSON invalide.'}, 400); }
       if (!body || typeof body !== 'object' || Array.isArray(body)) return json({error: 'Corps JSON invalide.'}, 400);
     }
-    // Legacy demo operations remain available to administrators only.
-    if (!body?.action && !isAdminPasswordValid(request.headers.get('x-admin-password'))) {
+    const isReset = body?.action === 'admin_reset_card';
+    if ((!body?.action || isReset) && !isAdminPasswordValid(request.headers.get('x-admin-password'))) {
       return json({error: 'Accès administrateur refusé.'}, 401);
     }
     let supabase;
     try { supabase = supabaseFactory(); }
     catch { return json({error: 'Configuration serveur incomplète.'}, 503); }
     try {
+      if (isReset) return await resetCard(body, supabase);
       if (body?.action) return await handleNfc(request, supabase, body);
       if (request.method === 'POST') return await createClientRecord(request, supabase);
       const cardUid = new URL(request.url).searchParams.get('card_uid');

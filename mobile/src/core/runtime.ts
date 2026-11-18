@@ -3,9 +3,14 @@ import { ApiClient } from './api';
 import { PhoneFlow } from './phone';
 import { MirrorFlow } from './mirror';
 import { accessStore, NativeMirror, phoneReader } from '../adapters/hardware';
+import { WifiMirror, mirrorAddress } from '../adapters/wifi-mirror';
+
+let wifiAddress = '172.20.10.4';
+export const getWifiAddress = () => wifiAddress;
+export const setWifiAddress = (address: string) => { wifiAddress = mirrorAddress(address); };
 export const api = new ApiClient(() => process.env.EXPO_PUBLIC_API_URL);
 export const phone = new PhoneFlow(api, phoneReader, accessStore);
-export const mirror = new MirrorFlow(api, new NativeMirror());
+export const mirror = new MirrorFlow(api, Platform.OS === 'ios' ? new WifiMirror(getWifiAddress) : new NativeMirror());
 // iPhone uses the same signed RC522 reader for all card operations.
 export const usesMirrorReader = Platform.OS === 'ios';
 export const cardReader = usesMirrorReader ? mirror : phone;

@@ -48,12 +48,13 @@ begin
   if r.state<>'pending' then
     return jsonb_build_object('error','Demande déjà utilisée. Relancez la lecture.','status',410);
   end if;
-  if r.kind='recovery' and not exists(
-    select 1 from public.clients where card_uid=p_uid and mobile_access_hash=p_access_hash
-  ) then
-    update public.nfc_requests set state='consumed',card_uid=p_uid where id=r.id;
-    -- Same response for unknown UID, old BLE-only enrollment and another owner.
-    return jsonb_build_object('error','Accès refusé. Utilisez le téléphone ayant inscrit cette carte.','status',403);
+  if r.kind='recovery' then
+    -- Keep the checked owner stable while recovery reads the session by UID.
+    perform 1 from public.clients where card_uid=p_uid and mobile_access_hash=p_access_hash for update;
+    if not found then
+      update public.nfc_requests set state='consumed',card_uid=p_uid where id=r.id;
+      return jsonb_build_object('error','Accès refusé. Utilisez le téléphone ayant inscrit cette carte.','status',403);
+    end if;
   end if;
   result := public.nfc_operation('scan','native-ios',p_hash,'',p_uid);
   if r.kind='registration' and result->>'state'='associated' then

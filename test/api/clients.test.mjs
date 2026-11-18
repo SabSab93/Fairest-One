@@ -18,6 +18,36 @@ test('UID lookup and direct registration require admin access', async () => {
   assert.equal((await handler.fetch(new Request('https://example.test/api/clients?card_uid=A1B2C3D4'))).status,401);
   assert.equal((await handler.fetch(request({email:'client@example.test',card_uid:uid}))).status,401);
 });
+test('card reset requires admin access and deletes only the confirmed association', async () => {
+  const clientId = 'c552232b-cdfb-49fa-88c3-48c04a5b03b8';
+  const reset = {action:'admin_reset_card', client_id:clientId, card_uid:uid};
+  const admin = {'X-Admin-Password':process.env.ADMIN_PASSWORD};
+  const filters = [];
+  let matches = true;
+  const query = {
+    delete: () => query,
+    eq: (key, value) => { filters.push([key, value]); return query; },
+    select: (columns) => { assert.equal(columns, 'id'); return query; },
+    maybeSingle: async () => ({data:matches ? {id:clientId} : null}),
+  };
+  let databaseCalls = 0;
+  const handler = createHandler(() => {
+    databaseCalls++;
+    return {from: table => { assert.equal(table, 'clients'); return query; }};
+  });
+
+  assert.equal((await handler.fetch(request(reset))).status, 401);
+  assert.equal((await handler.fetch(request(reset, {'X-Admin-Password':'incorrect'}))).status, 401);
+  assert.equal(databaseCalls, 0);
+  assert.equal((await handler.fetch(request({...reset, client_id:'invalid'}, admin))).status, 400);
+  assert.deepEqual(filters, []);
+  const response = await handler.fetch(request(reset, admin));
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {reset:true});
+  assert.deepEqual(filters, [['id', clientId], ['card_uid', uid]]);
+  matches = false;
+  assert.equal((await handler.fetch(request(reset, admin))).status, 404);
+});
 test('temporary registration challenge contains no server credentials', async () => {
   let args;
   const handler = createHandler(() => ({rpc:async (_, input) => {args=input;return {data:{state:'pending'},error:null};}}));
