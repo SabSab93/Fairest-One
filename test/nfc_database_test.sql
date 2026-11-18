@@ -54,6 +54,16 @@ begin
   perform pg_temp.expect((r->>'status')::int=410,'cancellation');
   perform pg_temp.expect(not has_function_privilege('anon','public.nfc_operation(text,text,text,text,text)','execute'),'anon cannot bypass API proof verification');
   perform pg_temp.expect(not has_table_privilege('authenticated','public.nfc_requests','select'),'no direct access to capabilities');
+  delete from public.clients where email='ble-integration@example.test' and card_uid='A1B2C3D4';
+  perform pg_temp.expect(not exists(select 1 from clients where card_uid='A1B2C3D4'),'reset frees the card');
+  perform pg_temp.expect((select count(*) from photos)=before_count,'reset deletes all captures for the removed client');
+  perform public.nfc_operation('begin_registration','test-c6','register-again','next-owner@example.test');
+  r := public.nfc_operation('scan','test-c6','register-again','','A1B2C3D4');
+  perform pg_temp.expect(r->>'state'='associated','the same card can be enrolled by another client');
+  perform public.nfc_operation('begin_recovery','test-c6','recover-new-owner');
+  r := public.nfc_operation('scan','test-c6','recover-new-owner','','A1B2C3D4');
+  perform pg_temp.expect(r->'client'->>'email'='next-owner@example.test','recovery selects the new owner');
+  perform pg_temp.expect(jsonb_array_length(r->'client'->'messages')=0,'new owner starts with no old captures');
 end $$;
 rollback;
 \echo 'NFC database scenarios passed (fixtures rolled back).'

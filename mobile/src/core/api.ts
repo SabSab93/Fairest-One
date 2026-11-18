@@ -71,4 +71,10 @@ export class ApiClient implements Api {
     if (!Array.isArray(rows)) throw new ApiError('Liste des clients invalide.', 502);
     return rows.map(clientRecord);
   }
+  async resetCard(clientId: string, cardUid: string, password: string, signal?: AbortSignal) {
+    const data = await this.request('POST', { action: 'admin_reset_card', client_id: clientId, card_uid: cardUid }, signal, password);
+    if (!data || typeof data !== 'object' || !('reset' in data) || data.reset !== true) {
+      throw new ApiError('La réinitialisation de la carte n’a pas été confirmée.', 502);
+    }
+  }
 }
